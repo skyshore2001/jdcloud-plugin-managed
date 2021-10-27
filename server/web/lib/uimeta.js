@@ -414,6 +414,13 @@ var UiMeta = {
 				onOk: 'close'
 			})
 		});
+	},
+
+	// e.g. WUI.showPage("pageIframe", "必应", ["http://cn.bing.com"])
+	initPageIframe: function (href) {
+		var jpage = $(this);
+		var jifr = jpage.find("iframe:first");
+		jifr.attr("src", href);
 	}
 }
 

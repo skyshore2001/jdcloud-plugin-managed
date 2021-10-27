@@ -1,4 +1,12 @@
-# managed - 托管接口与托管页面
+# managed - 托管接口与托管页面（二次开发支持）
+
+本插件基于筋斗云平台提供二次开发支持，包括用户自定义字段、自定义表和自定义逻辑（UDF/UDT/UDO）。
+
+- 它在管理端的系统设置中增加“开发”菜单
+- 可以创建新的数据模型，扩展系统后端接口，并可添加后端自定义业务逻辑；支持字段、虚拟字段、子表、AC类等扩展。
+- 可以基于数据模型创建管理端页面，支持主-子表、关联表等常见模型间关系。
+- 可以扩展管理端系统菜单项，显示对象页面、报表、预定义查询，或内嵌其它网页或系统。
+- 可以为已有对象扩展字段（UDF）、子表、业务逻辑，包括后端数据接口和前端管理页面。
 
 ## 用法
 
@@ -6,7 +14,7 @@
 
 	./tool/jdcloud-plugin.sh add ../jdcloud-plugin-jsonEditor
 
-插件会自动添加bootstrap库到文件系统。在store.html中添加引入bootstrap库用于美化编辑器风格：
+插件会自动添加bootstrap库到文件系统。在server/web/store.html中添加引入bootstrap库用于美化编辑器风格：
 
 	<link rel="stylesheet" type="text/css" href="lib/bootstrap.min.css" />
 
@@ -30,10 +38,24 @@
 					<div class="menu-expandable">
 						<a href="#pageDiMeta">数据模型</a>
 						<a href="#pageUiMeta">页面管理</a>
-						<a href="javascript:showDlgSetMenu()">菜单管理</a>
-						<a href="javascript:showDlgUiCfg('h5code')">前端代码</a>
+						<a href="javascript:UiMeta.showDlgSetMenu()">菜单管理</a>
+						<a href="javascript:UiMeta.showDlgUiCfg('h5code')">前端代码</a>
 					</div>
 				</div>
+
+在store.html中合适位置添加页面模板，它们会被用到：
+
+	<script type="text/html" id="tpl_pageIframe">
+	<div title="" my-initfn="UiMeta.initPageIframe">
+		<iframe style="width:100%;height:100%;border:0"></iframe>
+	</div>
+	</script>
+
+	<script type="text/html" id="tpl_dlgSetValue">
+	<form title="内容设置">
+		<textarea name="value" style="width:100%;height:100%;border:0"></textarea>
+	</form>
+	</script>
 
 在DESIGN.md中包含本插件：
 

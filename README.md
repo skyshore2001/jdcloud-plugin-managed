@@ -1,5 +1,50 @@
 # managed - 托管接口与托管页面
 
+## 用法
+
+先安装依赖的插件：
+
+	./tool/jdcloud-plugin.sh add ../jdcloud-plugin-jsonEditor
+
+插件会自动添加bootstrap库到文件系统。在store.html中添加引入bootstrap库用于美化编辑器风格：
+
+	<link rel="stylesheet" type="text/css" href="lib/bootstrap.min.css" />
+
+然后安装本插件：
+
+	./tool/jdcloud-plugin.sh add ../jdcloud-plugin-managed
+
+在store.html中引入文件uimeta.js，注意顺序！它必须在jdcloud-wui.js和jdcloud-wui-ext.js之间！
+
+	<script src="lib/jdcloud-wui.js"></script>
+	<script src="lib/uimeta.js"></script>
+	<script src="lib/jdcloud-wui-ext.js"></script>
+
+在store.html中，找到系统设置菜单，在它下面添加开发菜单：
+
+			<a><span><i class="fa fa-pencil-square-o"></i>系统设置</span></a>
+			...
+
+				<div class="menu-expand-group menu-dev">
+					<a><span>开发</span></a>
+					<div class="menu-expandable">
+						<a href="#pageDiMeta">数据模型</a>
+						<a href="#pageUiMeta">页面管理</a>
+						<a href="javascript:showDlgSetMenu()">菜单管理</a>
+						<a href="javascript:showDlgUiCfg('h5code')">前端代码</a>
+					</div>
+				</div>
+
+在DESIGN.md中包含本插件：
+
+	**[插件相关]**
+	...
+	@include server\plugin\jdcloud-plugin-managed.README.md
+
+用tool/upgrade.sh刷新数据库。
+
+最后在打开管理端时，记得添加URL参数dev，如 http://localhost/jdcloud-ganlan/server/web/store.html?dev
+
 ## 概要设计
 
 在系统设置菜单下，增加“开发”菜单。仅当有最高管理员权限且有URL参数dev时才显示该菜单。即通过如下URL激活开发菜单：

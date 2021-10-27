@@ -381,6 +381,39 @@ var UiMeta = {
 			}
 			fields.push(one);
 		}
+	},
+
+	// 用于主菜单
+	showDlgSetMenu: function () {
+		var initValue = null;
+		callSvr("UiCfg.getValue", {name: "menu"}, function (data) {
+			initValue = data;
+			DlgJson.show("schema/menu.js", initValue, onSetJson, {modal: false});
+		});
+		
+		function onSetJson (data) {
+			var str = JSON.stringify(data, null, 2);
+			if (str == initValue)
+				return;
+			callSvr("UiCfg.setValue", {name: "menu"}, function () {
+				app_show("已成功更新");
+			}, {value: str});
+		}
+	},
+	showDlgUiCfg: function (name) {
+		callSvr("UiCfg.getValue", {name: name}, function (data){
+			WUI.showDlg("#dlgSetValue_inst_uicfg", {
+				modal: false,
+				data: {value:data}, forSet: true, // 指定初始值，且只提交修改的内容
+				dialogOpt: {maximized: true},
+				// reload: true, // 每次都重新加载（测试用）
+				url: WUI.makeUrl("UiCfg.setValue", {name: name}),
+				onSubmit: function (data) {
+					eval(data.value); // 不抛异常就好
+				},
+				onOk: 'close'
+			})
+		});
 	}
 }
 

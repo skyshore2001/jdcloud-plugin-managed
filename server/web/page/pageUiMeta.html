@@ -1,0 +1,16 @@
+<div wui-script="pageUiMeta.js" title="页面" my-initfn="initPageUiMeta">
+	<table id="tblUiMeta" style="width:auto;height:100%">
+		<thead><tr>
+			<th data-options="field:'id', sortable:true, sorter:intSort">编号</th>
+			<th data-options="field:'diName', sortable:true, formatter:Formatter.linkTo('diId', '#dlgDiMeta')">数据模型</th>
+			<th data-options="field:'obj', sortable:true">对象名</th>
+			<th data-options="field:'name', sortable:true">页面名</th>
+			<th data-options="field:'defaultFlag', jdEnumMap: YesNoMap, formatter: Formatter.enum(YesNoMap), styler:Formatter.enumStyler({1:'Info'}), sortable:true">自动维护</th>
+			<!--th data-options="field:'cols', sortable:true">字段</th-->
+		</tr></thead>
+	</table>
+</div>
+<!-- examples:
+			<th data-options="field:'customerCode', sortable:true, formatter:Formatter.customerId">客户代码</th>
+			<th data-options="field:'status', sortable:true, jdEnumMap: OrderStatusMap, formatter: Formatter.enum(OrderStatusMap), styler:OrderColumns.statusStyler">状态</th>
+-->

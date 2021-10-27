@@ -1,0 +1,56 @@
+<form my-obj="UiMeta" title="页面" style="width:500px;height:400px;" wui-script="dlgUiMeta.js" my-initfn="initDlgUiMeta">
+	<table>
+		<tr>
+			<td>编号</td>
+			<td>
+				<input name="id" disabled>
+			</td>
+		</tr>
+		<tr>
+			<td>数据模型</td>
+			<td>
+				<div style="display:flex; width:95%">
+					<select name="diId" class="wui-combogrid" data-options="ListOptions.DiMetaGrid()" style="flex:auto"></select>
+					<a href="javascript:;" class="easyui-linkbutton btnSyncDi" data-options="iconCls:'icon-reload'" style="width:100px">同步</a>
+				</div>
+			</td>
+		</tr>
+		<tr>
+			<td>对象名</td>
+			<td>
+				<input name="obj" class="wui-picker-edit">
+				<p class="hint">不指定时，默认使用数据模型的显示名</p>
+			</td>
+		</tr>
+		<tr>
+			<td>页面名</td>
+			<td>
+				<input name="name" class="wui-picker-edit">
+				<p class="hint">不指定时，默认使用数据模型的显示名</p>
+			</td>
+		</tr>
+		<tr>
+			<td>字段</td>
+			<td class="wui-jsonEditor" data-options="input:false, schema:'schema/uicols.js'">
+				<textarea name="fields"  rows=3></textarea>
+				<p class="hint">
+					<a class="easyui-linkbutton btnEditJson" data-options="iconCls: 'icon-edit'" href="javascript:;">配置</a>
+					<a class="easyui-linkbutton btnEdit" data-options="iconCls: 'icon-edit'" href="javascript:;">直接修改</a>
+					<a class="easyui-linkbutton btnFormat" data-options="iconCls: 'icon-reload'" href="javascript:;">格式化</a>
+				</p>
+			</td>
+		</tr>
+		<tr>
+			<td>自动维护</td>
+			<td>
+				<select name="defaultFlag" class="my-combobox" data-options="jdEnumMap:YesNoMap"></select>
+				<p class="hint">如果为“是”，则在数据模型同步时自动更新</p>
+			</td>
+		</tr>
+	</table>
+</form>
+<!-- examples:
+<input name="name" class="easyui-validatebox" data-options="required:true">
+<select name="customerId" class="my-combobox" data-options="ListOptions.Customer()"></select>
+<select name="status" class="my-combobox" data-options="jdEnumMap:OrderStatusMap"></select>
+-->

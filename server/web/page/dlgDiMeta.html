@@ -1,0 +1,92 @@
+<form my-obj="DiMeta" title="数据模型" style="width:450px;height:600px;" wui-script="dlgDiMeta.js" my-initfn="initDlgDiMeta">
+	<table>
+		<tr>
+			<td>编号</td>
+			<td>
+				<input name="id" disabled>
+			</td>
+		</tr>
+		<tr>
+			<td>对象名</td>
+			<td>
+				<input name="name" class="easyui-validatebox" required>
+				<p class="hint">对应数据库表名和交互接口名，如"Item", "Ordr"等</p>
+			</td>
+		</tr>
+		<tr>
+			<td>生成托管接口</td>
+			<td>
+				<select name="manageAcFlag" class="my-combobox" data-options="jdEnumMap:{0:'否',1:'是',2:'扩展'}"></select>
+			</td>
+		</tr>
+		<tr>
+			<td>显示名</td>
+			<td>
+				<input name="title" >
+				<p class="hint">对象描述，如“物料”，“工单”等</p>
+			</td>
+		</tr>
+		<tr>
+			<td>字段</td>
+			<td class="wui-jsonEditor cols" data-options="schema:'schema/cols.js', input:false">
+				<textarea name="cols" rows=3 class="easyui-validatebox" required></textarea>
+				<p class="hint">
+					<a class="easyui-linkbutton btnEditJson" data-options="iconCls: 'icon-edit'" href="javascript:;">配置</a>
+					<a class="easyui-linkbutton btnEdit" data-options="iconCls: 'icon-edit'" href="javascript:;">直接修改</a>
+					<a class="easyui-linkbutton btnFormat" data-options="iconCls: 'icon-reload'" href="javascript:;">格式化</a>
+				</p>
+			</td>
+		</tr>
+		<tr>
+			<td>虚拟字段</td>
+			<td class="wui-jsonEditor" data-options="schema:'schema/vcols.js', input:false">
+				<textarea name="vcols"  rows=3></textarea>
+				<p class="hint">
+					<a class="easyui-linkbutton btnEditJson" data-options="iconCls: 'icon-edit'" href="javascript:;">配置</a>
+					<a class="easyui-linkbutton btnEdit" data-options="iconCls: 'icon-edit'" href="javascript:;">直接修改</a>
+					<a class="easyui-linkbutton btnFormat" data-options="iconCls: 'icon-reload'" href="javascript:;">格式化</a>
+				</p>
+			</td>
+		</tr>
+		<tr>
+			<td>子表</td>
+			<td class="wui-jsonEditor" data-options="schema:'schema/subobjs.js', input:false">
+				<textarea name="subobjs"  rows=3></textarea>
+				<p class="hint">
+					<a class="easyui-linkbutton btnEditJson" data-options="iconCls: 'icon-edit'" href="javascript:;">配置</a>
+					<a class="easyui-linkbutton btnEdit" data-options="iconCls: 'icon-edit'" href="javascript:;">直接修改</a>
+					<a class="easyui-linkbutton btnFormat" data-options="iconCls: 'icon-reload'" href="javascript:;">格式化</a>
+				</p>
+			</td>
+		</tr>
+
+		<tr>
+			<td>AC逻辑</td>
+			<td class="wui-jsonEditor" data-options="schema:'schema/acLogic.js', input:false">
+				<textarea name="acLogic"  rows=3></textarea>
+				<p class="hint">
+					<a class="easyui-linkbutton btnEditJson" data-options="iconCls: 'icon-edit'" href="javascript:;">配置</a>
+					<a class="easyui-linkbutton btnEdit" data-options="iconCls: 'icon-edit'" href="javascript:;">直接修改</a>
+					<a class="easyui-linkbutton btnFormat" data-options="iconCls: 'icon-reload'" href="javascript:;">格式化</a>
+				</p>
+			</td>
+		</tr>
+	</table>
+
+	<div class="easyui-tabs">
+		<div class="wui-subobj" data-options="obj:'UiMeta', relatedKey:'diId', dlg:'dlgUiMeta'" title="页面">
+			<table>
+				<thead><tr>
+					<!--th data-options="field:'id', sortable:true, sorter:intSort">编号</th-->
+					<th data-options="field:'name', sortable:true, formatter:Formatter.enum({null:'(默认)'})">页面名</th>
+					<th data-options="field:'defaultFlag', jdEnumMap: YesNoMap, formatter: Formatter.enum(YesNoMap), styler:Formatter.enumStyler({1:'Info'}), sortable:true">自动维护</th>
+				</tr></thead>
+			</table>
+		</div>
+	</div>
+</form>
+<!-- examples:
+<input name="name" class="easyui-validatebox" data-options="required:true">
+<select name="customerId" class="my-combobox" data-options="ListOptions.Customer()"></select>
+<select name="status" class="my-combobox" data-options="jdEnumMap:OrderStatusMap"></select>
+-->

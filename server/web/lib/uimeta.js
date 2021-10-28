@@ -22,6 +22,8 @@ var UiMeta = {
 	initUiMeta: function (uiMeta) {
 		var ctx = UiMeta.ctx;
 		$.each(uiMeta.fields, function (i, field) {
+			if (!field.title)
+				field.title = field.name;
 			if (field.opt && typeof(field.opt) === "string") {
 				field.opt = WUI.evalOptions(field.opt, ctx) || {};
 			}
@@ -44,6 +46,15 @@ var UiMeta = {
 		$.each(uiMetaArr, function (i, meta) {
 			UiMeta.initUiMeta(meta);
 		});
+	},
+	// 修改meta后调用，让meta立即生效
+	reloadUiMeta: function () {
+		this.metaMap = {};
+		this.udf = {};
+		callSvr("UiMeta.query", {cond:"isUdf=1", fmt:"array", for:"exec"}, function (data) {
+			UiMeta.initUiMetaArr(data);
+			console.log("reload uimeta");
+		})
 	},
 
 	// return: @columns
@@ -97,10 +108,15 @@ var UiMeta = {
 		var tpl2 = '<a href="{link}">{title}</a>';
 
 		var jo = $("#menu");
+		var isReset = jo.hasClass("wui-enhanced");
+		if (isReset)
+			jo.find(".wui-menu-dynamic").remove();
 		$.each(data, function (i, mi) {
 			applyMenu(jo, mi);
 		});
 		WUI.enhanceWithin(jo);
+		if (isReset)
+			WUI.enhanceMenu();
 
 		function applyMenu(jp, mi, level)
 		{
@@ -108,11 +124,13 @@ var UiMeta = {
 				level = 0;
 			if ($.isArray(mi.value)) {
 				var j1;
+				var isNew = true;
 				if (level == 0) {
 					// 如果顶级有同名菜单组，则j1直接用它，不必新建
 					jp.find(">div>.menu-expand-group").each(function () {
 						if ($(this).find(">a").text() == mi.name) {
 							j1 = $(this);
+							isNew = false;
 							return false;
 						}
 					});
@@ -129,6 +147,8 @@ var UiMeta = {
 				else {
 					j1 = $(WUI.applyTpl(tpl1, {title: mi.name})).appendTo(jp);
 				}
+				if (isNew)
+					j1.addClass("wui-menu-dynamic");
 				var j1p = j1.find(".menu-expandable");
 				$.each(mi.value, function (i1, mi1) {
 					applyMenu(j1p, mi1, level+1);
@@ -137,13 +157,29 @@ var UiMeta = {
 			else {
 				var j2 = $(WUI.applyTpl(tpl2, {title: mi.name})).appendTo(jp);
 				j2.attr("href", mi.value);
+				j2.addClass("wui-menu-dynamic");
 			}
 		}
 	},
 
 	init: function () {
+		var menuCode = 
+				'<div class="menu-expand-group menu-dev">' +
+					'<a><span>开发</span></a>' +
+					'<div class="menu-expandable">' +
+						'<a href="#pageDiMeta">数据模型</a>' +
+						'<a href="#pageUiMeta">页面管理</a>' +
+						'<a href="javascript:UiMeta.showDlgSetMenu()">菜单管理</a>' +
+						'<a href="javascript:UiMeta.showDlgUiCfg(\'h5code\')">前端代码</a>' +
+					'</div>' +
+				'</div>';
+		var jp = $("#menu .menu-expand-group:first .menu-expandable:first");
+		$(menuCode).appendTo(jp);
+		$("#menu .menu-dev").toggle(!!g_args.dev);
+
 		// load menu and globals
-		var url = WUI.makeUrl("UiCfg.script", {menuFn: "UiMeta.handleMenu", udfFn: "UiMeta.initUiMetaArr"});
+		//var url = WUI.makeUrl("UiCfg.script", {menuFn: "UiMeta.handleMenu", udfFn: "UiMeta.initUiMetaArr"});
+		var url = WUI.makeUrl("UiCfg.script");
 		WUI.loadScript(url, {async: false});
 
 		var myUDF = {
@@ -164,8 +200,6 @@ var UiMeta = {
 			}
 		}
 		WUI.UDF = myUDF;
-
-		$("#menu .menu-dev").toggle(!!g_args.dev);
 	},
 
 	guessType: function (name) {
@@ -319,6 +353,9 @@ var UiMeta = {
 					vFields[info.vField] = true;
 				}
 			}
+			else if (/(picId|pics|attId|atts|图片|附件)$/i.test(col.name)) {
+				uicol.uiType = "upload";
+			}
 			addField(uicol);
 		});
 
@@ -368,7 +405,9 @@ var UiMeta = {
 
 		function addField(one) {
 			if (! force) {
-				var idx = fields.findIndex(e => e.name == one.name);
+				var idx = fields.findIndex(function (e) {
+					return e.name == one.name;
+				});
 				if (idx >= 0) {
 					var uicol = fields[idx];
 					uicol.name = one.name;
@@ -396,6 +435,7 @@ var UiMeta = {
 			if (str == initValue)
 				return;
 			callSvr("UiCfg.setValue", {name: "menu"}, function () {
+				UiMeta.handleMenu(data);
 				app_show("已成功更新");
 			}, {value: str});
 		}
@@ -421,12 +461,30 @@ var UiMeta = {
 		var jpage = $(this);
 		var jifr = jpage.find("iframe:first");
 		jifr.attr("src", href);
+	},
+	formatter: {
+		DiMetaGrid: function () {
+			return {
+				jd_vField: "diName",
+				panelWidth: 450,
+				width: '95%',
+				textField: "title",
+				columns: [[
+					{field:'id',title:'编号',width:80},
+					{field:'name',title:'对象名',width:120},
+					{field:'title',title:'显示名',width:120}
+				]],
+				url: WUI.makeUrl('DiMeta.query', {
+					res: 'id,name,title',
+				})
+			}
+		}
 	}
 }
 
 var PageUi = {
 	show: function (name, title) {
-		WUI.showPage("PageUi", title||name, [name]);
+		WUI.showPage("pageUi", title||name, [name]);
 	}
 };
 

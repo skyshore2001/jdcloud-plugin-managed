@@ -28,20 +28,7 @@
 	<script src="lib/uimeta.js"></script>
 	<script src="lib/jdcloud-wui-ext.js"></script>
 
-在store.html中，找到系统设置菜单，在它下面添加开发菜单：
-
-			<a><span><i class="fa fa-pencil-square-o"></i>系统设置</span></a>
-			...
-
-				<div class="menu-expand-group menu-dev">
-					<a><span>开发</span></a>
-					<div class="menu-expandable">
-						<a href="#pageDiMeta">数据模型</a>
-						<a href="#pageUiMeta">页面管理</a>
-						<a href="javascript:UiMeta.showDlgSetMenu()">菜单管理</a>
-						<a href="javascript:UiMeta.showDlgUiCfg('h5code')">前端代码</a>
-					</div>
-				</div>
+如果想禁用本插件，只须注释掉对uimeta.js的引用即可。
 
 在store.html中合适位置添加页面模板，它们会被用到：
 

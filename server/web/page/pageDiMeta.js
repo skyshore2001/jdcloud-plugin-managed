@@ -27,7 +27,6 @@ function initPageDiMeta()
 		var row = WUI.getRow(jtbl);
 		if (row == null)
 			return;
-		WUI.unloadDialog(true);
 		WUI.showPage("pageUi", row.title+"!", [ row.title ]);
 	}};
 	jtbl.datagrid({
@@ -58,6 +57,8 @@ function initPageDiMeta()
 			ui.diId = row.id;
 			await callSvr("UiMeta.add", $.noop, ui);
 		}
+		WUI.unloadDialog(true);
+		UiMeta.reloadUiMeta();
 		app_alert("同步完成!");
 	}
 }

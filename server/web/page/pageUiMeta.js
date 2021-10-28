@@ -3,15 +3,6 @@ function initPageUiMeta()
 	var jpage = $(this);
 	var jtbl = jpage.find("#tblUiMeta");
 	var jdlg = $("#dlgUiMeta");
-	jdlg.objParam = {
-		// 当改动时清空uiMeta缓存，以便页面能刷新
-		onCrud: function () {
-			if (!window.UiMeta)
-				return;
-			console.log('clean metaMap');
-			UiMeta.metaMap = {};
-		}
-	}
 
 /*
 	// 定制工具栏增删改查按钮：r(refresh), f(find), a(add), s(set), d(del)

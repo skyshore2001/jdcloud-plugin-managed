@@ -78,14 +78,12 @@ function initDlgUi(opt)
 		setTimeout(onShow);
 
 		function onShow() {
-			var dialogOpt = jdlg.dialog('options');
-			if (dialogOpt.height == 'auto') {
-				var jp = jdlg.parent();
-				if (jp[0].scrollHeight > jp[0].clientHeight) {
-					console.log('adjust height');
-					jdlg.dialog({height: jp.outerHeight()});
-				}
-			}
+//			var dialogOpt = jdlg.dialog('options');
+//			if (dialogOpt.height == 'auto')
+			$(document).one("idle", function (ev) {
+				console.log('adjust height');
+				jdlg.dialog({height: "auto"});
+			});
 		}
 	}
 

@@ -5,7 +5,8 @@ function initDlgUiMeta()
 	var frm = jfrm[0];
 
 	jdlg.on("beforeshow", onBeforeShow)
-		.on("validate", onValidate);
+		.on("validate", onValidate)
+		.on("retdata", onRetData);
 
 	jdlg.find(".btnSyncDi").click(function (ev) {
 		var diId = $(frm.diId).val();
@@ -44,6 +45,12 @@ function initDlgUiMeta()
 
 	function onValidate(ev, mode, oriData, newData) 
 	{
+	}
+
+	function onRetData(ev, data, formMode) {
+		if (formMode == FormMode.forSet) {
+			UiMeta.reloadUiMeta();
+		}
 	}
 }
 

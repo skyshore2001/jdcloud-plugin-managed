@@ -31,8 +31,10 @@ var UiMeta = {
 				field.opt = {};
 			}
 			if (field.linkTo && (field.uiType == "combo-db" || field.uiType == "combogrid")) {
-				var opt = UiMeta.getUicolOptForLinkTo(field, field.uiType);
-				$.extend(true, field.opt, opt);
+				if (!field.opt || !field.opt.combo) {
+					var opt = UiMeta.getUicolOptForLinkTo(field, field.uiType);
+					$.extend(true, field.opt, opt);
+				}
 			}
 			if (field.uiMeta) {
 				UiMeta.initUiMeta(field.uiMeta);
@@ -115,8 +117,10 @@ var UiMeta = {
 			applyMenu(jo, mi);
 		});
 		WUI.enhanceWithin(jo);
-		if (isReset)
+		if (isReset) {
 			WUI.enhanceMenu();
+			WUI.applyPermission();
+		}
 
 		function applyMenu(jp, mi, level)
 		{
@@ -156,7 +160,8 @@ var UiMeta = {
 			}
 			else {
 				var j2 = $(WUI.applyTpl(tpl2, {title: mi.name})).appendTo(jp);
-				j2.attr("href", mi.value);
+				var href = /^(http|#|javascript)/.test(mi.value)? mi.value: "javascript:" + mi.value;
+				j2.attr("href", href);
 				j2.addClass("wui-menu-dynamic");
 			}
 		}
@@ -176,6 +181,7 @@ var UiMeta = {
 		var jp = $("#menu .menu-expand-group:first .menu-expandable:first");
 		$(menuCode).appendTo(jp);
 		$("#menu .menu-dev").toggle(!!g_args.dev);
+		WUI.enhanceWithin(jp);
 
 		// load menu and globals
 		//var url = WUI.makeUrl("UiCfg.script", {menuFn: "UiMeta.handleMenu", udfFn: "UiMeta.initUiMetaArr"});
@@ -225,6 +231,7 @@ var UiMeta = {
 		});
 	},
 	addField: function (jdlg, jtbl, field) {
+		field = $.extend(true, {}, field); // 防止被修改
 		if (field.uiType != "subobj") {
 			var tpl = "<tr><td>{title}</td><td></td></tr>";
 			var jtr = $(WUI.applyTpl(tpl, field)).appendTo(jtbl);
@@ -264,12 +271,21 @@ var UiMeta = {
 			}
 		}
 		if (ji && field.opt) {
-			if (field.opt.attr)
+			if (field.opt.attr) {
 				ji.attr(field.opt.attr);
-			if (field.opt.class)
+				delete field.opt.attr;
+			}
+			if (field.opt.class) {
 				ji.addClass(field.opt.class);
-			if (field.opt.style)
+				delete field.opt.class;
+			}
+			if (field.opt.style) {
 				ji.css(field.opt.style);
+				delete field.opt.style;
+			}
+
+			var logic = $.extend({}, field.opt); // 从组件opt中独立出来，避免被组件影响
+			WUI.setDlgLogic(jdlg, field.name, logic);
 		}
 	},
 
@@ -329,6 +345,8 @@ var UiMeta = {
 	},
 
 	// 从DiMeta同步到UiMeta，结果设置到uiMeta={obj, name, fields}并返回uiMeta
+	// 默认只更新相关字段name,type,title,linkTo属性，这样可以保留字段顺序、opt配置等；如果ui.defaultFlag，则会删除多余字段。
+	// 如果force=1则全部重新生成。
 	syncDi: function (di, ui, force) {
 		if (ui == null)
 			ui = {};
@@ -338,6 +356,7 @@ var UiMeta = {
 		var fields = !force && ui.fields? JSON.parse(ui.fields): [];
 		var cols = di.cols? JSON.parse(di.cols): [];
 		var vFields = {}; // linkTo产生的虚拟字段
+		var newFields = {}; // field => true
 		$.each(cols, function (i, col) {
 			var uicol = {
 				name: col.name,
@@ -353,8 +372,10 @@ var UiMeta = {
 					vFields[info.vField] = true;
 				}
 			}
-			else if (/(picId|pics|attId|atts|图片|附件)$/i.test(col.name)) {
+			else if (/(picId|pics|attId|atts|图|图片|附件)$/i.test(col.name)) {
 				uicol.uiType = "upload";
+				if (/Id$/.test(col.name))
+					uicol.opt = {multiple: false};
 			}
 			addField(uicol);
 		});
@@ -373,10 +394,16 @@ var UiMeta = {
 				if (vFields[uicol.name]) {
 					uicol.notInList = true;
 				}
+				else if (/(picId|pics|attId|atts|图|图片|附件)$/i.test(uicol.name)) {
+					uicol.uiType = "upload";
+					uicol.opt = { attr: {disabled: 'disabled'} };
+					if (/Id$/.test(uicol.name))
+						uicol.opt.multiple = false;
+				}
 				// 虚拟字段默认在对话框上disable
 				else {
 					uicol.uiType = "text";
-					uicol.opt = "{attr: {disabled: 'disabled'}}";
+					uicol.opt = {attr: {disabled: 'disabled'}};
 				}
 				addField(uicol);
 			});
@@ -390,20 +417,26 @@ var UiMeta = {
 				uiType: "subobj",
 				uiMeta: subobj.title,
 			};
-			var opt = {
+			uicol.opt = {
 				obj: subobj.obj,
 				relatedKey: subobj.cond,
 				valueField: subobj.name,
 				dlg: 'dlgUi_inst_' + subobj.title
 			};
-			uicol.opt = JSON.stringify(opt, null, 2);
 			addField(uicol);
 		});
+
+		if (ui.defaultFlag) {
+			fields = $.map(fields, function (e) {
+				return newFields[e.name]? e: null;
+			});
+		}
 
 		ui.fields = JSON.stringify(fields);
 		return ui;
 
 		function addField(one) {
+			newFields[one.name] = true;
 			if (! force) {
 				var idx = fields.findIndex(function (e) {
 					return e.name == one.name;
@@ -418,6 +451,8 @@ var UiMeta = {
 					return;
 				}
 			}
+			if (one.opt)
+				one.opt = JSON.stringify(one.opt, null, 2);
 			fields.push(one);
 		}
 	},
@@ -507,6 +542,7 @@ uiTypes["combo-simple"] = {
 			jdEnumList: field.opt.enumList
 		});
 		ji.mycombobox();
+		return ji;
 	}
 }
 
@@ -530,6 +566,7 @@ uiTypes["combo"] = {
 			jdEnumMap: opt.enumMap
 		});
 		ji.mycombobox();
+		return ji;
 	}
 }
 
@@ -550,6 +587,7 @@ uiTypes["combo-db"] = {
 		var ji = $(WUI.applyTpl(tpl, field)).appendTo(ctx.jtd);
 		WUI.setOptions(ji, opt.combo);
 		ji.mycombobox();
+		return ji;
 	}
 }
 
@@ -569,6 +607,7 @@ uiTypes["combogrid"] = {
 		var tpl = '<select class="wui-combogrid" name="{name}">';
 		var ji = $(WUI.applyTpl(tpl, field)).appendTo(ctx.jtd);
 		WUI.setOptions(ji, opt.combo);
+		return ji;
 	}
 }
 
@@ -590,6 +629,7 @@ uiTypes["upload"] = {
 		var ji = $(WUI.applyTpl(tpl1, field)).appendTo(jtd);
 		jtd.addClass("wui-upload");
 		WUI.setOptions(jtd, opt);
+		return jtd;
 	}
 }
 
@@ -613,6 +653,7 @@ uiTypes["subobj"] = {
 		var subCols = UiMeta.addColByMeta([], field.uiMeta);
 		opt.datagrid = {columns: [ subCols ] };
 		WUI.setOptions(jsub, opt);
+		return jsub;
 	}
 }
 });

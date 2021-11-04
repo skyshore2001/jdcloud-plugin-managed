@@ -78,12 +78,6 @@ function initDlgUi(opt)
 		setTimeout(onShow);
 
 		function onShow() {
-//			var dialogOpt = jdlg.dialog('options');
-//			if (dialogOpt.height == 'auto')
-			$(document).one("idle", function (ev) {
-				console.log('adjust height');
-				jdlg.dialog({height: "auto"});
-			});
 		}
 	}
 

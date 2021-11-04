@@ -196,11 +196,46 @@ vcol for search: isUdf(DiMeta.manageAcFlag=2)
 
 - @fields: field/uicol={name, title, type, uiType, opt, notInList, linkTo?, uiMeta?}
 
-- uiType: Enum(text, combobox, combogrid, file, subobj, null-不显示)
-- opt: 是一段JS代码（不是JSON），它将被执行做为每个字段的选项，其执行结果是一个对象。根据uiType不同，opt中需要的内容也不同。
-	通用opt: {%attr, %style, class}
-- notInList: Boolean.
-- uiMeta: 仅用于uiType=subobj，链接UiMeta.name
+	- uiType: Enum(text, combobox, combogrid, file, subobj, null-不显示)
+	- opt: 是一段JS代码（不是JSON），它将被执行做为每个字段的选项，其执行结果是一个对象。根据uiType不同，opt中需要的内容也不同。
+		通用opt: {%attr, %style, class}
+	- notInList: Boolean.
+	- uiMeta: 仅用于uiType=subobj，链接UiMeta.name
+
+#### 通用选项
+
+- opt.attr 设置属性。例如多行文本字段可设置`{rows:3}`指定行数
+
+- opt.style 设置样式
+
+- opt.class 设置类
+
+- opt.required 为1表示必填
+
+- opt.validType 用于文本框，验证方式。
+
+控制显示、禁用、只读及初始值，可以区分添加还是更新模式：
+示例：
+
+	{
+		show: false,
+		showForAdd: false, // 默认是显示
+		showForSet: e => e.status == "CR", // 返回bool，根据其它值判断
+
+		disable: true,
+		disableForAdd: true,
+		disableForSet: true,
+
+		readonly: true,
+		readonlyForAdd: true,
+		readonlyForSet: true,
+
+		value: (e, it) => e.code + "-" + e.name,
+		valueForAdd: () => new Date().format("D"), // 返回当前日期
+
+		onChange: (v, it) => it("title").val(v),
+		setOption: e => ListOptions.ItemGrid({type: e.type})
+	}
 
 #### 固定值下拉列表(uiType=combo)
 
@@ -470,3 +505,19 @@ UiMeta全局配置配置
 
 	var url = WUI.makeUrl("UiCfg.getValue", {name: "h5code", _raw:1});
 	WUI.loadScript(url)
+
+## 专题设计
+
+如何修改对话框已有字段的逻辑？
+
+A:可以在其它字段的逻辑里一起修改。目前onWatch回调提供gn函数可以操作任意字段。
+
+对话框上能动态隐藏字段，在列表上是否能生效？
+
+如何定制列表页上的操作按钮？比如点击显示关联对象，或做设置操作。
+
+共用页面如何实现？
+
+如何自定义报表和自定义查询并加入菜单？
+
+A:已实现自定义报表。

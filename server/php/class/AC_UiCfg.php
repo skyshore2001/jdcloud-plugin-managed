@@ -38,7 +38,7 @@ class AC0_UiCfg extends AccessControl
 			echo("$cb($menu);\n");
 
 		$ac = new AC0_UiMeta();
-		$arr = $ac->callSvc("UiMeta", "query", ["cond" => ["isUdf"=>1], "for"=>"exec", "fmt"=>"array"]);
+		$arr = $ac->callSvc("UiMeta", "query", ["cond" => ["isUdf"=>1, "defaultFlag"=>1], "for"=>"exec", "fmt"=>"array"]);
 		if (count($arr) > 0) {
 			echo($cb2 . '(' . jsonEncode($arr, $this->env->TEST_MODE) . ");\n");
 		}

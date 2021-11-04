@@ -18,7 +18,8 @@ function initDlgUiMeta()
 	function api_DiMetaGet(data) {
 		// console.log(data);
 		var ui = {
-			fields: $(frm.fields).val()
+			fields: $(frm.fields).val(),
+			defaultFlag: $(frm.defaultFlag).val() // 如果为1，则覆盖fields
 		};
 		UiMeta.syncDi(data, ui);
 		$(frm.obj).val(ui.obj);

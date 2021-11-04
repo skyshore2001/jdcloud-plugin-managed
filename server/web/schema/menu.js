@@ -18,9 +18,10 @@ var schema = {
 					title: "值",
 					oneOf: [
 						{
-							title: "链接",
+							title: "链接/代码",
 							type: "string",
-							description: '示例: <code style="margin-left:10px">http://baidu.com</code> <code style="margin-left:10px">javascript:PageUi.show("物料")</code>'
+							format: "textarea",
+							description: '示例: <code style="margin-left:10px">http://baidu.com</code> <code style="margin-left:10px">PageUi.show("物料")</code>'
 						},
 						{
 							title: "子菜单",

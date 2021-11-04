@@ -6,7 +6,12 @@ var schema = {
 	items: {
 		title: "字段",
 		type: "object",
-		headerTemplate: "{{i1}} {{self.name}}",
+//		headerTemplate: "{{i1}} {{self.name}} {{self.title}}",
+		options: {
+			onNotify: function (val, isManualChange) {
+				return val.title? val.title + '(' + val.name + ')': val.name;
+			}
+		},
 		properties: {
 			name: {
 				title: "name/字段名",
@@ -130,7 +135,21 @@ var schema = {
 					onClick: function (ev) {
 						if ($(ev.target).is(".btnExample")) {
 							var field = this.parent.getValue();
-							this.setValue(examples[field.uiType]);
+							var code = examples[field.uiType];
+							if (!code)
+								return;
+							if (field.linkTo && field.name) {
+								// {name: "itemId", linkTo: "ShopItem.name", table: "ShopItem", alias: "item", vField: "itemName", targetField: "name"}
+								$.extend(field, UiMeta.parseLinkTo(field));
+							}
+							code = WUI.applyTpl(code, field);
+							this.setValue(code);
+						}
+					},
+					onNotify: function (val, isManualChange) {
+						// 验证代码是否正确
+						if (isManualChange && val) {
+							WUI.evalOptions(val, {});
 						}
 					}
 				},
@@ -139,6 +158,7 @@ var schema = {
 		}
 	}
 };
+
 var examples = {
 	combo: 
 `{
@@ -159,20 +179,20 @@ var examples = {
 	// enumList: ctx.OrderStatusList,
 	enumList: "新创建;待服务;已服务",
 	// 不同值的颜色设置
-	styler: Formatter.enumStyler({CR: "Info"})
+	styler: Formatter.enumStyler({新创建: "Info"})
 }`,
 
 	"combo-db": 
 `{
 	// 链接到对话框
-	// formatter: ctx.empId
-	formatter: WUI.formatter.linkTo("empId", "#dlgEmployee", true),
+	// formatter: ctx.{name}
+	// formatter: WUI.formatter.linkTo("{name}", "#dlg{table}", true),
 
 	// combo: ctx.Employee
 	combo: {
 		valueField: "id",
-		jd_vField: "empName",
-		url: WUI.makeUrl('Employee.query', {
+		jd_vField: "{vField}",
+		url: WUI.makeUrl('{table}.query', {
 			res: 'id,name',
 			pagesz: -1
 		}),
@@ -183,12 +203,12 @@ var examples = {
 	"combogrid": 
 `{
 	// 链接到对话框
-	// formatter: ctx.empId
-	formatter: WUI.formatter.linkTo("empId", "#dlgEmployee", true),
+	// formatter: ctx.{name}
+	// formatter: WUI.formatter.linkTo("{name}", "#dlg{table}", true),
 
-	// combo: ctx.EmployeeGrid
+	// combo: ctx.{table}Grid()
 	combo: {
-		jd_vField: "empName",
+		jd_vField: "{vField}",
 		panelWidth: 450,
 		width: '95%',
 		textField: "name",
@@ -196,7 +216,7 @@ var examples = {
 			{field:'id',title:'编号',width:80},
 			{field:'name',title:'名称',width:120},
 		]],
-		url: WUI.makeUrl('Employee.query', {
+		url: WUI.makeUrl('{table}.query', {
 			res: 'id,name',
 		})
 	}
@@ -205,9 +225,9 @@ var examples = {
 	subobj:
 `{
 	obj: 'Ordr1',
-	relatedKey:'orderId', // 'orderId={id}'
-	valueField:'orders',
-	dlg:'dlgUi_inst_Ordr1'
+	relatedKey:'orderId',
+	valueField:'{name}',
+	dlg:'dlgUi_inst_{uiMeta}'
 }`
 };
 

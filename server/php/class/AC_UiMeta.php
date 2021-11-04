@@ -17,6 +17,13 @@ class AC0_UiMeta extends AccessControl
 				jdRet(E_PARAM, "cannot find UiMeta.name=`$name`", "找不到页面`$name`");
 		}
 	}
+	protected function onValidate() {
+		// 防止转义
+		foreach ($_POST as $k=>&$v) {
+			if (is_scalar($v))
+				$v = dbExpr(Q($v));
+		}
+	}
 	protected function onQuery()
 	{
 		$for = param("for", null, "G");

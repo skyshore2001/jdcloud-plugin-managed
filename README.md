@@ -506,18 +506,140 @@ UiMeta全局配置配置
 	var url = WUI.makeUrl("UiCfg.getValue", {name: "h5code", _raw:1});
 	WUI.loadScript(url)
 
-## 专题设计
+## 专题问题
 
-如何修改对话框已有字段的逻辑？
+### 如何设置系统标题?
 
-A:可以在其它字段的逻辑里一起修改。目前onWatch回调提供gn函数可以操作任意字段。
+菜单`开发-前端代码`中添加代码：
 
-对话框上能动态隐藏字段，在列表上是否能生效？
+	$(function () {
+		setAppTitle("毅博仓储智能管理系统");
+	});
 
-如何定制列表页上的操作按钮？比如点击显示关联对象，或做设置操作。
+### 如何修改对话框已有字段的逻辑？
 
-共用页面如何实现？
+可以在其它字段的逻辑里一起修改。目前onWatch回调提供gn函数可以操作任意字段。
 
-如何自定义报表和自定义查询并加入菜单？
+如果想完全控制对话框逻辑，可以监听对话框相关事件。示例：隐藏系统已有的订单对话框上的“描述”字段。
 
-A:已实现自定义报表。
+	$(document).on("create", "#dlgOrder", function (ev) {
+		var jdlg = $(ev.target);
+		WUI.setDlgLogic(jdlg, "dscr", {show: false});
+	});
+
+或者：
+
+	$(document).on("show", "#dlgOrder", function (ev, formMode, initData) {
+		var jdlg = $(ev.target);
+		jdlg.gn("dscr").visible(false);
+	});
+
+上面代码可以打开菜单`开发-前端代码`，加入其中。
+
+在二次开发调试时，会反复修改代码，可以先在控制台中执行它。
+为了避免事件重复绑定造成重复执行，建议每次绑定事件(on)前先解除绑定(off)，
+而为了避免影响所有的同类事件，建议用jquery事件的namespace特性去限定事件名。
+
+上述代码的最佳实践写法为：
+
+	$(document).off("create.dlgOrder").on("create.dlgOrder", "#dlgOrder", dlgOrder_onCreate);
+	function dlgOrder_onCreate(ev) {
+		var jdlg = $(ev.target);
+		WUI.setDlgLogic(jdlg, "dscr", {show: false});
+	}
+
+用带限定的事件名`create.dlgOrder`来替代`create`事件，先off再on避免重复绑定。
+
+注意如果是自定义对象，比如“商品”对话框，则以`#dlgUi_inst_商品`来访问对话框，示例：
+
+	$(document).off("create.商品").on("create.商品", "#dlgUi_inst_商品", 商品_onCreate);
+	function 商品_onCreate(ev) {
+		var jdlg = $(ev.target);
+		WUI.setDlgLogic(jdlg, "name", {
+			readonlyForSet: true
+		});
+	}
+
+这等价于在页面字段"name"上设置readonlyForSet属性。
+
+### 如何定制列表页上的操作按钮？比如点击显示关联对象，或做设置操作。
+
+处理dg_toolbar事件，匹配当前页面对象。
+示例：在自定义的商品页面上，加上“关联订单”按钮。
+
+	$(document).off("dg_toolbar.商品").on("dg_toolbar.商品", ".wui-page-商品", 商品_onToolbar);
+	function 商品_onToolbar(ev, buttons, jtbl, jdlg) {
+		// var jpage = $(ev.target);
+		// console.log(jpage);
+		var btnLinkToOrder = {text: "关联订单", iconCls: "icon-redo", handler: function () {
+			var row = WUI.getRow(jtbl);
+			if (row == null)
+				return;
+			var pageFilter = { cond: {itemId: row.id} };
+			WUI.showPage("pageOrder", "关联订单-" + row.name, [null, pageFilter] );
+		}};
+		buttons.push(btnLinkToOrder);
+	}
+
+参考demo2管理端入门学习案例，关联操作的设计模式有好几种，除了在工具栏菜单，也可在单元格中点击关联对象的数目等，这可以设置相应组件的formatter方法。
+
+以上代码加到菜单`开发-前端代码`中。
+
+注意：如果是系统页面，需要用选择器".wui-page.pageOrder"来匹配页面，如：
+
+	$(document).off("dg_toolbar.pageOrder").on("dg_toolbar.pageOrder", ".wui-page.pageOrder", pageOrder_onToolbar);
+	function pageOrder_onToolbar(ev, buttons, jtbl, jdlg) {
+		// var jpage = $(ev.target);
+		// console.log(jpage);
+		var btnLinkToItem = {text: "关联商品", iconCls: "icon-redo", handler: function () {
+			var row = WUI.getRow(jtbl);
+			if (row == null)
+				return;
+			var pageFilter = { cond: {id: row.itemId} };
+			PageUi.show("商品", "关联商品-订单"+row.id, pageFilter);
+		}};
+		buttons.push(btnLinkToItem);
+	}
+
+### 共用页面如何实现？
+
+对话框上能动态隐藏字段，在列表上是否能生效？列表上能传标题到对话框吗？
+
+常常用于多类型共用页面的处理，比如订单通过“订单类型”字段分为“商品”订单和“服务”订单，可以用pageFilter机制分别打开。
+(参考管理端教程中的例子)
+
+打开服务订单试试：
+
+	WUI.showPage("pageOrder", "服务订单", [null, {cond: {订单类型:"服务"}}])
+
+再打开商品单试试：
+
+	WUI.showPage("pageOrder", "商品订单", [null, {cond: {订单类型:"商品"}}])
+
+要动态设置表格字段，建议也是监听dg_toolbar事件，用setTimeout等待数据表初始化次做设定。
+
+	$(document).off("dg_toolbar.pageOrder").on("dg_toolbar.pageOrder", ".wui-page.pageOrder", pageOrder_onToolbar)
+	function pageOrder_onToolbar(ev, buttons, jtbl, jdlg) {
+		var jpage = $(ev.target);
+		// 传title参数给关联的对话框
+		jdlg.objParam = {
+			title: jpage.attr("title")
+		};
+		setTimeout(onPageInit);
+
+		function onPageInit() {
+			var type = WUI.getPageFilter(jpage, "订单类型");
+			WUI.toggleFields(jtbl, {
+				itemName: type == "商品",
+				price: type == "商品",
+				itemPicId: type == "商品",
+				qty: type == "商品"
+			});
+		}
+	}
+
+### 如何自定义报表并加入菜单？
+
+通过在数据表左上角右键，打开自定义报表对话框，设定好报表后，选上“复制报表代码”即可。
+如果以开发模式打开的（URL中有dev参数），它会询问是否添加到菜单。这时可把代码添加到自定义菜单去。
+

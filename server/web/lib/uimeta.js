@@ -518,8 +518,8 @@ var UiMeta = {
 }
 
 var PageUi = {
-	show: function (name, title) {
-		WUI.showPage("pageUi", title||name, [name]);
+	show: function (name, title, pageFilter) {
+		WUI.showPage("pageUi", title||name, [name, pageFilter]);
 	}
 };
 

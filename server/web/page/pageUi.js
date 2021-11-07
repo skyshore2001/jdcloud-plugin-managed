@@ -4,6 +4,7 @@ function initPageUi(name)
 	var jtbl = jpage.find("#tblUi");
 	var jdlg = $("#dlgUi_inst_" + name);
 
+	jpage.addClass("wui-page-" + name);
 /*
 	// 定制工具栏增删改查按钮：r(refresh), f(find), a(add), s(set), d(del)
 	jtbl.jdata().toolbar = "rfs";

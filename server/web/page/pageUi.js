@@ -1,7 +1,21 @@
-function initPageUi(name)
+/**
+@module pageUi 通用托管页面
+
+- showPageOpt: {uimeta?=title}
+- 通过uimeta参数指定UiMeta名字，如果未指定则与title参数相同。
+
+示例：
+
+	WUI.showPage("pageUi", "售后工单");
+	// 等价于
+	WUI.showPage("pageUi", {title: "售后工单", uimeta: "售后工单"});
+
+*/
+function initPageUi(opt)
 {
 	var jpage = $(this);
 	var jtbl = jpage.find("#tblUi");
+	var name = opt.title || opt.uimeta;
 	var jdlg = $("#dlgUi_inst_" + name);
 
 	jpage.addClass("wui-page-" + name);

@@ -3,7 +3,7 @@ class AC0_UiMeta extends AccessControl
 {
 	protected $vcolDefs = [
 		[
-			"res" => ["di.title diName", "ifnull(di.name,t0.obj) obj", "if(di.manageAcFlag=2,1,0) isUdf"],
+			"res" => ["di.title diName", "ifnull(di.name,t0.obj) obj", "(case when di.manageAcFlag=2 then 1 else 0 end) isUdf"],
 			"join" => "LEFT JOIN DiMeta di ON di.id=t0.diId",
 			"default" => true,
 		]

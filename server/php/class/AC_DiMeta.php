@@ -15,6 +15,26 @@ class AC0_DiMeta extends AccessControl
 			$this->syncAc([$meta]);
 	}
 
+	function api_syncAll() {
+		$this->cleanAc();
+		$metaList = queryAll("SELECT * FROM DiMeta", true);
+		$this->syncDb($metaList);
+		$this->syncAc($metaList);
+	}
+
+	function api_cleanAll() {
+		$this->cleanAc();
+		execOne("TRUNCATE DiMeta");
+		execOne("TRUNCATE UiMeta");
+		execOne("TRUNCATE UiCfg");
+	}
+
+	private function cleanAc() {
+		exec('sh -c "git ls-files --others \"php/class/AC_*.php\" | xargs rm -rf" 2>&1', $out, $rv);
+		if ($rv)
+			jdRet(E_SERVER, "exec fails: " . join("\n", $out));
+	}
+
 	function syncDb($metaArr)
 	{
 		$tableDefs = arrMap($metaArr, function ($meta) {

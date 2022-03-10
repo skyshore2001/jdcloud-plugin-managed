@@ -6,6 +6,7 @@ var schema = {
 	items: {
 		title: "字段",
 		type: "object",
+//		format: "categories",
 //		headerTemplate: "{{i1}} {{self.name}} {{self.title}}",
 		options: {
 			onNotify: function (val, isManualChange) {
@@ -91,6 +92,7 @@ var schema = {
 				type: "string",
 				enum: [
 					"text",
+					"json",
 					"combo-simple",
 					"combo",
 					"combo-db",
@@ -102,6 +104,7 @@ var schema = {
 				options: {
 					enum_titles: [
 						"text:文本框",
+						"json:JSON配置",
 						"combo-simple:下拉列表",
 						"combo:下拉列表-值映射",
 						"combo-db:下拉列表-接口取值",
@@ -154,6 +157,31 @@ var schema = {
 					}
 				},
 				description: "<a class='easyui-linkbutton btnExample' href='javascript:;'>查看示例</a>"
+			},
+			pos: {
+				title: "pos/对话框排版",
+				type: "object",
+				format: "grid",
+				properties: {
+					inline: {
+						type: "boolean",
+						required: true,
+						format: "checkbox",
+						description: "勾上表示使用多列布局，本字段接上一字段，不换行。"
+					},
+					extend: {
+						type: "integer",
+						description: "在多列布局时，设置1表示多占用1个字段的位置。"
+					},
+					group: {
+						type: "string",
+						description: "指定分组名，字段开始一个新的组（显示一行横线）。`-`表示没有名字。"
+					},
+					tab: {
+						type: "string",
+						description: "字段放在指定Tab页上，如`基本`, `高级`"
+					}
+				}
 			}
 		}
 	}
@@ -228,11 +256,17 @@ var examples = {
 	relatedKey:'orderId',
 	valueField:'{name}',
 	dlg:'dlgUi_inst_{uiMeta}'
-}`
+}`,
+
+	json: 
+`{
+	schema: "schema-example.js",
+	input: true,
+	rows: 10
+}`,
 };
 
 ({
 	schema: schema,
 	no_additional_properties: true,
-	show_opt_in: false
 })

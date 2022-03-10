@@ -1,4 +1,6 @@
 <?php
+namespace DiMetaTpl;
+
 echo("<?php\n");
 
 function writeArr($name, $arr)
@@ -6,7 +8,7 @@ function writeArr($name, $arr)
 	if (empty($arr))
 		return;
 	echo("\tprotected \$$name = ");
-	echo DiMeta::exportArr($arr, 1);
+	echo \DiMeta::exportArr($arr, 1);
 	echo(";\n\n");
 }
 
@@ -14,7 +16,7 @@ function writeFn($k, $v)
 {
 	echo("\tprotected function $k() {\n");
 	echo("\t\tparent::$k();\n");
-	echo(DiMeta::indent(2, $v));
+	echo(\DiMeta::indent(2, $v));
 	echo("\t}\n\n");
 }
 

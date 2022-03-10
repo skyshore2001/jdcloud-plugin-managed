@@ -21,7 +21,7 @@ var schema = {
 							title: "链接/代码",
 							type: "string",
 							format: "textarea",
-							description: '示例: <code style="margin-left:10px">http://baidu.com</code> <code style="margin-left:10px">PageUi.show("物料")</code>'
+							description: '示例: <code style="margin-left:10px">http://baidu.com</code> <code style="margin-left:10px">WUI.showPage("pageUi", "物料")</code>'
 						},
 						{
 							title: "子菜单",

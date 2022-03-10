@@ -1,11 +1,12 @@
 <?php
+namespace DiMetaTpl2;
 echo("<?php\n");
 
 function writeArr($name, $arr)
 {
 	if (empty($arr))
 		return;
-	$value = DiMeta::exportArr($arr, 2);
+	$value = \DiMeta::exportArr($arr, 2);
 	echo("\t\t\$$name = $value;\n");
 	if (isArrayAssoc($arr)) {
 		echo("\t\tforeach (\$$name as \$k => \$v) {\n");
@@ -23,7 +24,7 @@ function writeFn($k, $v)
 {
 	echo("\tprotected function $k() {\n");
 	echo("\t\tparent::$k();\n");
-	echo(DiMeta::indent(2, $v));
+	echo(\DiMeta::indent(2, $v));
 	echo("\t}\n\n");
 }
 

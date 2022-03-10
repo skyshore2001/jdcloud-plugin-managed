@@ -159,6 +159,14 @@ var UiMeta = {
 				});
 			}
 			else {
+				if (mi.name[0] == '-') {
+					var name = mi.name.substr(1)
+					jp.find(">a").each(function (i, e) {
+						if ($(e).text() == name)
+							$(e).hide();
+					});
+					return;
+				}
 				var j2 = $(WUI.applyTpl(tpl2, {title: mi.name})).appendTo(jp);
 				var href = /^(http|#|javascript)/.test(mi.value)? mi.value: "javascript:" + mi.value;
 				j2.attr("href", href);
@@ -225,17 +233,87 @@ var UiMeta = {
 	},
 
 	addFieldByMeta: function (jdlg, jtbl, uiMeta) {
+		var fieldsInLine = getFieldsInLine();
+		if (! uiMeta.isUdf)
+			jdlg.css("width", 200 + fieldsInLine * 250);
+		jdlg.data("fieldsInLine", fieldsInLine);
+
 		$.each(uiMeta.fields, function () {
 			if (this.uiType)
 				UiMeta.addField(jdlg, jtbl, this);
 		});
+
+		function getFieldsInLine() {
+			var maxCnt = 1;
+			var cnt = 0;
+			$.each(uiMeta.fields, function () {
+				if (this.uiType && !(this.pos && this.pos.tab)) {
+					if (! (this.pos && this.pos.inline)) {
+						if (cnt > maxCnt) {
+							maxCnt = cnt;
+						}
+						cnt = 0;
+					}
+					cnt += 1 + (this.pos && this.pos.extend || 0);
+				}
+			});
+			return maxCnt;
+		}
 	},
 	addField: function (jdlg, jtbl, field) {
 		field = $.extend(true, {}, field); // 防止被修改
+
+		// 支持字段分布在tab页: pos.tab
+		if (field.pos && field.pos.tab) {
+			var tabname = field.pos.tab;
+			// 替换jtbl
+			jtbl = jdlg.find(".easyui-tabs .wui-form-tab[title=" + tabname + "] .wui-form-table");
+			if (jtbl.size() == 0) {
+				var code = WUI.applyTpl('<div class="wui-form-tab" title="{title}">' + 
+					'<table class="wui-form-table"></table>' + 
+				'</div>', {title: tabname});
+
+				var jcont = jdlg.find(".easyui-tabs");
+				if (jcont.length == 0) {
+					jcont = $('<div class="easyui-tabs" style="width:100%">' + code + '</div>').appendTo(jdlg);
+					jtbl = jcont.find(".wui-form-table");
+				}
+				else {
+					var jtab = $(code).appendTo(jcont);
+					jtbl = jtab.find(".wui-form-table");
+				}
+			}
+		}
+
+		// 支持字段分组: pos.group
+		if (field.pos && field.pos.group) {
+			var title = field.pos.group;
+			if (title == "-")
+				title = "";
+			var colspan = (jdlg.data("fieldsInLine")||1) * 2;
+			var code = WUI.applyTpl('<tr><td colspan="{colspan}">' +
+				'<div class="form-caption"><hr>{title}</div>' +
+			'</td></tr>', {title: title, colspan: colspan});
+			$(code).appendTo(jtbl);
+		}
+
 		if (field.uiType != "subobj") {
-			var tpl = "<tr><td>{title}</td><td></td></tr>";
-			var jtr = $(WUI.applyTpl(tpl, field)).appendTo(jtbl);
-			var jtd = jtr.find("td:eq(1)");
+			// 支持多列布局 pos.inline=true
+			if (field.pos && field.pos.inline) {
+				var tpl = "<td>{title}</td><td></td>";
+				var jtr = jtbl.find("tr:last");
+				jtr.append($(WUI.applyTpl(tpl, field)));
+			}
+			else {
+				var tpl = "<tr><td>{title}</td><td></td></tr>";
+				var jtr = $(WUI.applyTpl(tpl, field)).appendTo(jtbl);
+			}
+			var jtd = jtr.find("td:last");
+			// 支持多列布局中字段拉伸占位 pos.extend
+			if (field.pos && field.extend) {
+				var colspan = field.extend * 2 + 1;
+				jtd.attr("colspan", colspan);
+			}
 		}
 
 		var ui = UiMeta.uiTypes[field.uiType];
@@ -254,8 +332,12 @@ var UiMeta = {
 			}
 			else if (field.type == "date" || field.type == "tm") {
 				ji.attr("placeholder", "年-月-日");
-				if (field.type == "date")
-					ji.attr("type", "date");
+				if (field.type == "date") {
+					ji.addClass("easyui-datebox");
+				}
+				else {
+					ji.addClass("easyui-datetimebox");
+				}
 				// NOTE: 带时间的类型"datetime-local"要求格式必须为"2020-01-10T00:10"这种
 			}
 			else if (field.type == "i" || field.type == "real" || field.type == "n") {
@@ -282,6 +364,9 @@ var UiMeta = {
 			if (field.opt.style) {
 				ji.css(field.opt.style);
 				delete field.opt.style;
+			}
+			if (field.opt.required) {
+				jtd.prev().append('*');
 			}
 
 			var logic = $.extend({}, field.opt); // 从组件opt中独立出来，避免被组件影响
@@ -517,12 +602,6 @@ var UiMeta = {
 	}
 }
 
-var PageUi = {
-	show: function (name, title, pageFilter) {
-		WUI.showPage("pageUi", title||name, [name, pageFilter]);
-	}
-};
-
 $(function () {
 
 UiMeta.init();
@@ -654,6 +733,33 @@ uiTypes["subobj"] = {
 		opt.datagrid = {columns: [ subCols ] };
 		WUI.setOptions(jsub, opt);
 		return jsub;
+	}
+}
+
+uiTypes["json"] = {
+	// ctx: {col}
+	renderCol: function (field, ctx) {
+		ctx.col.width = 200;
+	},
+	// ctx: {jtd}
+	renderInput: function (field, ctx) {
+		var opt = $.extend({
+			schema: 'schema-example.js',
+			input: true,
+			rows: 10
+		}, field.opt);
+
+		var tpl1 = '<textarea name="{name}" rows=' + opt.rows + '></textarea>' + 
+				'<p class="hint">' + 
+					'<a class="easyui-linkbutton btnEdit" data-options="iconCls: \'icon-edit\'" href="javascript:;">修改</a>' +
+					'<a class="easyui-linkbutton btnFormat" data-options="iconCls: \'icon-reload\'" href="javascript:;">格式化JSON</a>' +
+					'<a class="easyui-linkbutton btnEditJson" data-options="iconCls: \'icon-edit\'" href="javascript:;">配置</a>' +
+				'</p>';
+		var jtd = ctx.jtd;
+		var ji = $(WUI.applyTpl(tpl1, field)).appendTo(jtd);
+		jtd.addClass("wui-jsonEditor");
+		WUI.setOptions(jtd, opt);
+		return jtd;
 	}
 }
 });

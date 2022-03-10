@@ -1,4 +1,4 @@
-# managed - 托管接口与托管页面（二次开发支持）
+# managed - 托管接口与托管页面（二次开发支持 / Addon扩展程序）
 
 本插件基于筋斗云平台提供二次开发支持，包括用户自定义字段、自定义表和自定义逻辑（UDF/UDT/UDO）。
 
@@ -196,11 +196,16 @@ vcol for search: isUdf(DiMeta.manageAcFlag=2)
 
 - @fields: field/uicol={name, title, type, uiType, opt, notInList, linkTo?, uiMeta?}
 
-	- uiType: Enum(text, combobox, combogrid, file, subobj, null-不显示)
+	- uiType: Enum(text/json, combo/combo-simple/combo-db/combogrid, file, subobj, null-不显示)
 	- opt: 是一段JS代码（不是JSON），它将被执行做为每个字段的选项，其执行结果是一个对象。根据uiType不同，opt中需要的内容也不同。
 		通用opt: {%attr, %style, class}
 	- notInList: Boolean.
 	- uiMeta: 仅用于uiType=subobj，链接UiMeta.name
+	- pos: 对话框中排版设置。示例：{tab:"基本",group:"-",inline:true,extend:1}
+		- tab: 指定在哪个tab页。如果不指定则在对话框上方。
+		- group: 指定在哪个组。如果不指定则在默认上方组；如果指定为"-"表示没有组名。
+		- inline: 如果为true，表示使用多列布局，该组件接上一组件，不换行。
+		- extend: 在多列布局中，指定扩展几列。值为1表示占用2列(colspan=3)；值为2表示占用3列(colspan=5)。
 
 #### 通用选项
 
@@ -236,6 +241,24 @@ vcol for search: isUdf(DiMeta.manageAcFlag=2)
 		onChange: (v, it) => it("title").val(v),
 		setOption: e => ListOptions.ItemGrid({type: e.type})
 	}
+
+#### 文本框(uiType=text)
+
+如果type=s，默认以input来展现；如果type=t，或长度大于200，则以textarea来展现。
+
+#### JSON配置框(uiType=json)
+
+读写JSON配置，可以设置schema文件来编辑JSON。
+
+以下选项用于json editor，后面的值是默认选项值：
+
+	schema: "schema-example.js",
+	input: true, // 如果设置为false，则不显示输入框
+	rows: 10 // 输入框显示多少行
+
+采用jdcloud-plugin-jsonEditor来实现。
+
+#### 固定值下拉列表(uiType=text)
 
 #### 固定值下拉列表(uiType=combo)
 
@@ -364,6 +387,57 @@ vcol for search: isUdf(DiMeta.manageAcFlag=2)
 
 TODO: 后端实现：qsearch
 
+示例：当选择了一个工件(snId, 使用combogrid组件)后，自动填充工单(orderId, 使用combogrid组件)、工单开工时间(actualTm)等字段。
+
+	{
+		combo: {
+			jd_vField: "snCode",
+			panelWidth: 450,
+			width: '95%',
+			textField: "code",
+			columns: [[
+				{field:'id',title:'编号',width:80},
+				{field:'code',title:'序列号',width:120},
+				{field:'orderName',title:'工单',width:120},
+				{field:'category',title:'型号',width:120},
+			]],
+			url: WUI.makeUrl('Sn.query', {
+				res: 'id,code,orderId,orderName,orderCode,cateId,category',
+			})
+		},
+
+		// 监听自己，当选择一个工件后，自动填充其它字段
+		watch: "snId",
+		onWatch: async function (e, ev, gn) {
+			console.log(ev);
+
+			// 自动填充工单。gn对combogrid组件可以设置一个数组，同时设置value和text
+			gn("orderId").val([ev.data.orderId, ev.data.orderCode]);
+			// 也可以只设置值：gn("orderId").val(ev.data.orderId);
+
+			// 发起查询，填写工单时间
+			var rv = await callSvr("Ordr.get", {id: ev.data.orderId, res: "actualTm"})
+			gn("actualTm").val(rv.actualTm);
+
+			// 再发起查询，自动填写型号和产品线
+			var rv = await callSvr("Category.get", {id: ev.data.cateId, res: "fatherName, fatherName2"})
+			gn("series").val(rv.fatherName);
+			gn("productLine").val(rv.fatherName2);
+		}
+	}
+
+上面两个查询是先后依次调用的，也可以并行调用：
+
+	var rv = await Promise.all([
+		callSvr("Ordr.get", {id: ev.data.orderId, res: "actualTm"})
+		callSvr("Category.get", {id: ev.data.cateId, res: "fatherName, fatherName2"})
+	]);
+
+	gn("actualTm").val(rv[0].actualTm);
+
+	gn("series").val(rv[1].fatherName);
+	gn("productLine").val(rv[1].fatherName2);
+
 #### 子表(uiType=subobj)
 
 这时field.name必须与UiMeta.name匹配，表示引用哪个子表。
@@ -433,7 +507,8 @@ TODO: 后端实现：qsearch
 
 	[
 		{name: "运营管理", value: [
-			{name: "测试1", value: "测试1"}
+			{name: "测试1", value: "测试1"},
+			{name: "-订单管理", value: ""}
 		]},
 		{name: "新菜单组", value: [
 			{name: "测试1", value: "测试1"}
@@ -441,6 +516,8 @@ TODO: 后端实现：qsearch
 	]
 
 如果第一级菜单名在原菜单中存在，则做合并处理，否则新增该菜单。
+
+如果菜单名为"-"开头，表示删除当前层级下某个已有菜单项。
 
 TODO: order属性: 指定菜单项顺序值，呈现时由小到大排序，在不指定时（包括系统默认的菜单项，是未指定顺序的），则同一级依次为100, 200, 300, ...
 
@@ -464,12 +541,25 @@ TODO: order属性: 指定菜单项顺序值，呈现时由小到大排序，在�
 
 DiMeta同步：
 
-	DiMeta.sync(id, force?)
+	DiMeta.sync(id, noSyncDb?, force?)
 
 - 与数据库做同步，创建表或更新字段。
 	注意默认不会删除或修改字段类型，除非加force=1标志。因为字段可能用了一段时间，很可能需要手工升级后才能删除或调整，TODO 做这些操作须调用DiMeta.diff接口后得到SQL语句，去数据库手工执行。
 
+- 如果指定参数noSyncDb=1，则不刷新数据库，只重新创建后端AC类。
 - 若manageAcFlag=1，则创建或更新相应的AC类。（删除由DiMeta.del接口完成，不在sync接口中）
+
+	DiMeta.syncAll()
+
+- 清空php/class下所有不在git管理下的AC开头文件。
+- 分别同步每个DiMeta
+
+清除addon：
+
+	DiMeta.cleanAll()
+
+- 清除DiMeta, UiMeta和UiCfg
+- 注意此操作无法恢复! 注意确保addon已打包（导出）。
 
 ### UiMeta
 
@@ -505,6 +595,81 @@ UiMeta全局配置配置
 
 	var url = WUI.makeUrl("UiCfg.getValue", {name: "h5code", _raw:1});
 	WUI.loadScript(url)
+
+## 部署
+
+Addon程序存储在开发数据库中。可以通过命令行和在线执行两种方式来部署Addon。
+
+核心程序是 
+
+	server/tool/upgrade-addon.php
+
+习惯上，是通过在tool目录下运行make命令执行相应操作：
+
+	# 打包，即生成安装包到server/tool/upgrade/addon.sql.gz，它类似`make meta`生成META文件。
+	make addon
+
+	# 使用addon.sql.gz文件来安装addon
+	make addon-install
+
+	# 清空addon程序
+	make addon-clean
+
+也可以直接命令行访问，如：
+
+	# 打包
+	php server/tool/upgrade-addon.php
+	# 安装
+	php server/tool/upgrade-addon.php install
+	# 清空
+	php server/tool/upgrade-addon.php clean
+
+也可以在线访问，主要用在线上环境上直接升级，如：
+
+	# 打包
+	http://{baseurl}/tool/upgrade-addon.php
+
+	# 安装
+	http://{baseurl}/tool/upgrade-addon.php/install
+
+	# 清空
+	http://{baseurl}/tool/upgrade-addon.php/clean
+
+注意：
+
+- 其中用到sh(包括常用shell命令), git, mysqldump, mysql等工具，确保它们都在PATH中可直接调用。
+
+- 在Windows环境下，sh是安装git-bash后自带的（路径示例：C:\Program Files\Git\usr\bin）；mysql等是安装mariadb后自带的（路径示例：D:\MariaDB 10.3\bin）。
+	如果使用Apache系统服务的方式（默认是SYSTEM用户执行），应确保上述命令行在系统PATH（而不只是当前用户的PATH）中。
+
+- Win10环境中Apache+php调用shell可能会卡死，应修改git-bash下的文件：/etc/nsswitch.conf （路径示例：C:\Program Files\Git\etc\nsswitch.conf）
+
+		db_home: env 
+		#db_home: env windows cygwin desc
+
+### 打包
+
+	php server/tool/upgrade-addon.php
+
+它连接conf.user.php中设置的数据库，导出Addon程序到server/tool/upgrade/addon.sql.gz文件（并添加到git）。
+
+实现时内部使用了mysqldump工具（确保在PATH路径中）。
+
+### 部署
+
+部署Addon（初始安装或更新）:
+
+	php server/tool/upgrade-addon.php install
+
+或在线执行
+
+	http://{baseurl}/tool/upgrade-addon.php/install
+	或
+	http://{baseurl}/tool/upgrade-addon.php?ac=install
+
+- 自动导入addon.sql.gz文件。
+- 内部使用mysql工具（确保在PATH路径中），导入相关表到数据库中。注意：即使是更新，也是全部删除后重建addon相关的表。
+- 调用DiMeta.syncAll接口刷新数据库。
 
 ## 专题问题
 
@@ -642,4 +807,60 @@ UiMeta全局配置配置
 
 通过在数据表左上角右键，打开自定义报表对话框，设定好报表后，选上“复制报表代码”即可。
 如果以开发模式打开的（URL中有dev参数），它会询问是否添加到菜单。这时可把代码添加到自定义菜单去。
+
+### 对话框上字段排版
+
+如果字段很多，在对话框上常常使用多列布局（典型地，每行2个字段）、字段分组（组间有分隔线）、字段分页（一些字段放在Tab页中）。
+
+这些可以调整页面上字段的排版设置实现：uicol.pos
+
+示例：如下排版
+
+	字段1 字段2
+	字段3
+
+配置：
+
+	字段2：pos.inline=true
+
+示例：如下排版（字段3占满一行空间）
+
+	字段1 字段2
+	字段3......
+
+配置：
+
+	字段2：pos.inline=true
+	字段3：pos.extend=1
+
+示例：如下排版
+
+	字段1 字段2
+	字段3
+	------------
+	*分组1*
+	字段4 字段5
+
+	[分页1]
+	字段a1
+	字段a2
+
+	[分页2]
+	字段b1 字段b2
+	------------
+	字段b3.......
+
+配置：
+
+	字段2：pos.inline=true
+	字段4：pos.group=分组1 (分组只要指定一次，同组的“字段5”等无须再指定group)
+
+	字段a1: pos.tab=分页1
+	字段a2: pos.tab=分页1
+	
+	字段b1: pos.tab=分页2
+	字段b2: pos.tab=分页2, pos.inline=true
+	字段b3: pos.tab=分页2, pos.group="-", pos.extend=1 （指定分组但无名字）
+
+注意：也可以所有字段都在分组中的。
 

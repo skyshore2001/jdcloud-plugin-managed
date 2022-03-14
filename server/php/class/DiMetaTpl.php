@@ -1,7 +1,7 @@
 <?php
 namespace DiMetaTpl;
 
-echo("<?php\n");
+if (!function_exists('DiMetaTpl\writeArr')) {
 
 function writeArr($name, $arr)
 {
@@ -47,6 +47,9 @@ function writeAcClass($AC, $meta)
 	echo("}\n\n");
 }
 
+} /* namespace */
+
+echo("<?php\n");
 foreach (["AC0", "AC1", "AC2"] as $AC) {
 	writeAcClass($AC, $meta);
 }

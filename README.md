@@ -604,12 +604,16 @@ Addon程序存储在开发数据库中。可以通过命令行和在线执行两
 
 	server/tool/upgrade-addon.php
 
+它依赖php-xml软件，在CentOS Linux上应安装：
+
+	sudo yum install php-xml
+
 习惯上，是通过在tool目录下运行make命令执行相应操作：
 
-	# 打包，即生成安装包到server/tool/upgrade/addon.sql.gz，它类似`make meta`生成META文件。
+	# 打包，即生成安装包到server/tool/upgrade/addon.xml，它类似`make meta`生成META文件。
 	make addon
 
-	# 使用addon.sql.gz文件来安装addon
+	# 使用addon.xml文件来安装addon
 	make addon-install
 
 	# 清空addon程序
@@ -637,12 +641,12 @@ Addon程序存储在开发数据库中。可以通过命令行和在线执行两
 
 注意：
 
-- 其中用到sh(包括常用shell命令), git, mysqldump, mysql等工具，确保它们都在PATH中可直接调用。
+- 其中用到sh(包括常用shell命令), git等工具，确保它们都在PATH中可直接调用。
 
-- 在Windows环境下，sh是安装git-bash后自带的（路径示例：C:\Program Files\Git\usr\bin）；mysql等是安装mariadb后自带的（路径示例：D:\MariaDB 10.3\bin）。
+- 在Windows环境下，sh是安装git-bash后自带的（路径示例：C:\Program Files\Git\usr\bin）
 	如果使用Apache系统服务的方式（默认是SYSTEM用户执行），应确保上述命令行在系统PATH（而不只是当前用户的PATH）中。
 
-- Win10环境中Apache+php调用shell可能会卡死，应修改git-bash下的文件：/etc/nsswitch.conf （路径示例：C:\Program Files\Git\etc\nsswitch.conf）
+- Windows环境中Apache+php调用shell命令可能会卡死，应修改git-bash下的文件：/etc/nsswitch.conf （路径示例：C:\Program Files\Git\etc\nsswitch.conf）
 
 		db_home: env 
 		#db_home: env windows cygwin desc
@@ -651,9 +655,7 @@ Addon程序存储在开发数据库中。可以通过命令行和在线执行两
 
 	php server/tool/upgrade-addon.php
 
-它连接conf.user.php中设置的数据库，导出Addon程序到server/tool/upgrade/addon.sql.gz文件（并添加到git）。
-
-实现时内部使用了mysqldump工具（确保在PATH路径中）。
+它连接conf.user.php中设置的数据库，导出Addon程序到server/tool/upgrade/addon.xml文件（并添加到git）。
 
 ### 部署
 
@@ -667,8 +669,8 @@ Addon程序存储在开发数据库中。可以通过命令行和在线执行两
 	或
 	http://{baseurl}/tool/upgrade-addon.php?ac=install
 
-- 自动导入addon.sql.gz文件。
-- 内部使用mysql工具（确保在PATH路径中），导入相关表到数据库中。注意：即使是更新，也是全部删除后重建addon相关的表。
+- 自动导入addon.xml文件。
+- 注意：即使是更新，也是全部删除后重建addon相关的表。
 - 调用DiMeta.syncAll接口刷新数据库。
 
 ## 专题问题

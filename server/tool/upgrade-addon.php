@@ -1,9 +1,9 @@
 <?php
 
-chdir(__DIR__);
-require_once("../api.php");
+chdir(__DIR__ . '/..'); // baseDir: server/
+require_once("api.php");
 
-$addonPackage="upgrade/addon.sql.gz";
+$addonPackage="tool/upgrade/addon.xml";
 
 if (isCLI()) {
 	$ac = $argv[1];
@@ -29,55 +29,147 @@ else {
 	echo("Usage: php upgrade-addon.php all|install|clean\n");
 }
 
-function setEnvForDb()
-{
-	$P_DB = getenv("P_DB");
-	$P_DBCRED = getenv("P_DBCRED");
-
-	assert($P_DB && $P_DBCRED);
-	if (! preg_match('/^"?(.*?)(:(\d+))?\/(\w+)"?$/', $P_DB, $ms))
-		die("bad db=`{$P_DB}`");
-	$dbhost = $ms[1];
-	$dbport = $ms[3] ?: 3306;
-	$dbname = $ms[4];
-
-	list($dbuser, $dbpwd) = getCred($P_DBCRED); 
-	putenv("dbhost=$dbhost");
-	putenv("dbport=$dbport");
-	putenv("dbname=$dbname");
-	putenv("dbuser=$dbuser");
-	putenv("dbpwd=$dbpwd");
-
-	global $addonPackage;
-	putenv("addon=$addonPackage");
-}
-
 function doExport()
 {
-	setEnvForDb();
-	$cmd = 'sh -c "mysqldump -h $dbhost -P $dbport -u $dbuser -p\"$dbpwd\" $dbname DiMeta UiMeta UiCfg | gzip > $addon 2>&1"';
-	$out = system($cmd, $rv);
-	if ($rv) {
-		echo("*** fail to export addon.\n");
-		return;
-	}
+	$wr = new XmlWriter();
+	$wr->openMemory();
+	$wr->setIndent(true);
+	$wr->startElement("JdcloudAddon");
+	Db2Xml::writeXmlWithJsonFields($wr, "DiMeta", ["cols", "vcols", "subobjs", "acLogic"]);
+	Db2Xml::writeXmlWithJsonFields($wr, "UiMeta", ["fields"]);
+	Db2Xml::writeXml($wr, "UiCfg");
+	$wr->endElement();
+
 	global $addonPackage;
+	$xml = $wr->outputMemory(true);
+	file_put_contents($addonPackage, $xml);
 	echo("=== create server/tool/$addonPackage\n");
 
-	$cmd = 'sh -c "git add $addon"';
-	$out = system($cmd, $rv);
+	myexec("git add $addonPackage");
+}
+
+class Db2Xml
+{
+/*
+fieldFn($k, $v): 对字段进行自定义处理
+*/
+	static function writeXml($wr, $table, $fieldFn = null) {
+		$arr = queryAll("SELECT * FROM $table", true);
+		self::writeArr($wr, $arr, $table . "Table", $table, $fieldFn);
+	}
+
+/*
+对于json字符串字段，直接展开它。通过jsonFields指定json字段。
+*/
+	static function writeXmlWithJsonFields($wr, $table, $jsonFields) {
+		self::writeXml($wr, $table, function ($k, $v) use ($wr, $jsonFields) {
+			if (in_array($k, $jsonFields)) {
+				$jsonObj = jsonDecode($v);
+				self::writeOne($wr, $k, $jsonObj);
+				return true;
+			}
+		});
+	}
+
+	static function writeArr($wr, $arr, $arrName, $elemName, $fieldFn = null) {
+		$wr->startElement($arrName);
+		$wr->writeAttribute("count", count($arr)); // count属性作为array标识，在readOne时用
+		foreach ($arr as $e) {
+			self::writeOne($wr, $elemName, $e, $fieldFn);
+		}
+		$wr->endElement();
+	}
+
+	static function writeOne($wr, $k, $v, $fieldFn = null) {
+		if ($v === null)
+			return;
+
+		if (is_array($v)) {
+			if (isArray012($v)) {
+				self::writeArr($wr, $v, $k, $k . '-element', $fieldFn);
+				return;
+			}
+
+			// is obj
+			$wr->startElement($k);
+			foreach ($v as $k1=>$v1) {
+				self::writeOne($wr, $k1, $v1, $fieldFn);
+			}
+			$wr->endElement();
+			return;
+		}
+
+		if (is_string($v) && $v != "") {
+			if ($fieldFn && $fieldFn($k, $v) === true) {
+				return;
+			}
+			if (preg_match('/[\'\"\n]/', $v)) {
+				$wr->startElement($k);
+				if (stripos($v, "\n") !== false) {
+					$v = "\n" . trim($v) . "\n";
+				}
+				$wr->writeCData($v);
+				$wr->endElement();
+				return;
+			}
+		}
+		$wr->writeElement($k, $v);
+	}
+
+	// $xml: SimpleXMLElement
+	static function readArr($xml) {
+		$ret = [];
+		foreach ($xml->children() as $k => $xml1) {
+			$v = self::readOne($xml1);
+			$ret[] = $v;
+		}
+		return $ret;
+	}
+	static function readObj($xml, $doJson=false) {
+		$ret = [];
+		foreach ($xml->children() as $k => $xml1) {
+			$v = self::readOne($xml1);
+			if ($doJson && is_array($v))
+				$v = jsonEncode($v, true);
+			$ret[$k] = $v;
+		}
+		return $ret;
+	}
+	static function readOne($xml) {
+		$atts = $xml->attributes();
+		// is array
+		if (isset($atts->count)) {
+			return self::readArr($xml);
+		}
+
+		if ($xml->count() == 0)
+			return trim((string)$xml);
+
+		// is obj
+		return self::readObj($xml);
+	}
+
+	static function readXml($file) {
+		$rootXml = simplexml_load_file($file);
+		if ($rootXml->getName() != "JdcloudAddon")
+			jdRet(E_PARAM, "bad jscloud addon package");
+		foreach ($rootXml as $table => $tableXml) { // table: <DiMetaTable>
+			$tableName = preg_replace('/Table$/', '', $table);
+			execOne("TRUNCATE TABLE $tableName");
+			foreach ($tableXml as $rowXml) {
+				$rowData = self::readObj($rowXml, true);
+				dbInsert($tableName, $rowData, true);
+//				echo(jsonEncode($rowData, true));
+			}
+		}
+	}
 }
 
 function doImport()
 {
-	setEnvForDb();
+	global $addonPackage;
+	Db2Xml::readXml($addonPackage);
 
-	$cmd = 'sh -c "zcat $addon | mysql -h $dbhost -P $dbport -u $dbuser -p\"$dbpwd\" $dbname 2>&1"';
-	$out = system($cmd, $rv);
-	if ($rv) {
-		echo("*** fail to import addon.\n");
-		return;
-	}
 	echo("=== import done\n");
 
 	login();
@@ -102,6 +194,7 @@ function doCleanAll()
 
 function login()
 {
-	session_start(); // 注意：此处开的session位置与默认callSvc中位置不同，不影响正常应用的登录。
+	if (! isCLI())
+		session_start(); // 注意：此处开的session位置与默认callSvc中位置不同，不影响正常应用的登录。
 	$_SESSION["empId"] = 1;
 }

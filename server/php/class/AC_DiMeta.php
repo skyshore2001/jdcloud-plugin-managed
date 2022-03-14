@@ -30,9 +30,8 @@ class AC0_DiMeta extends AccessControl
 	}
 
 	private function cleanAc() {
-		exec('sh -c "git ls-files --others \"php/class/AC_*.php\" | xargs rm -rf" 2>&1', $out, $rv);
-		if ($rv)
-			jdRet(E_SERVER, "exec fails: " . join("\n", $out));
+		// xargs -r: no run if empty
+		myexec('git ls-files --others "php/class/AC_*.php" | xargs -r rm -rf 2>&1');
 	}
 
 	function syncDb($metaArr)

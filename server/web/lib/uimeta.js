@@ -49,11 +49,11 @@ var UiMeta = {
 			UiMeta.initUiMeta(meta);
 		});
 	},
-	// 修改meta后调用，让meta立即生效
+	// 修改meta后调用，让meta立即生效; return dfd.
 	reloadUiMeta: function () {
 		this.metaMap = {};
 		this.udf = {};
-		callSvr("UiMeta.query", {cond:"isUdf=1", fmt:"array", for:"exec"}, function (data) {
+		return callSvr("UiMeta.query", {cond:"isUdf=1", fmt:"array", for:"exec"}, function (data) {
 			UiMeta.initUiMetaArr(data);
 			console.log("reload uimeta");
 		})
@@ -168,8 +168,20 @@ var UiMeta = {
 					return;
 				}
 				var j2 = $(WUI.applyTpl(tpl2, {title: mi.name})).appendTo(jp);
-				var href = /^(http|#|javascript)/.test(mi.value)? mi.value: "javascript:" + mi.value;
-				j2.attr("href", href);
+				if (/^(http|#|javascript)/.test(mi.value)) {
+					j2.attr("href", mi.value);
+				}
+				else {
+					j2.click(function (ev) {
+						ev.preventDefault();
+						if (mi.value.indexOf("await") >= 0) { // 支持await
+							var code = "var f1 = async function () {\n" + mi.value + "\n};\nf1();\n";
+							eval(code);
+							return;
+						}
+						eval(mi.value);
+					});
+				}
 				j2.addClass("wui-menu-dynamic");
 			}
 		}
@@ -214,6 +226,16 @@ var UiMeta = {
 			}
 		}
 		WUI.UDF = myUDF;
+
+		WUI.PageHeaderMenu.items.push('<div id="reloadUiMeta">刷新Addon</div>');
+		WUI.PageHeaderMenu.reloadUiMeta = function () {
+			UiMeta.metaMap = {};
+			UiMeta.udf = {};
+			var url = WUI.makeUrl("UiCfg.script");
+			WUI.loadScript(url, {async: false});
+			WUI.reloadPage();
+			WUI.reloadDialog(true);
+		}
 	},
 
 	guessType: function (name) {
@@ -561,19 +583,50 @@ var UiMeta = {
 		}
 	},
 	showDlgUiCfg: function (name) {
-		callSvr("UiCfg.getValue", {name: name}, function (data){
-			WUI.showDlg("#dlgSetValue_inst_uicfg", {
+		var dfd = $.when(callSvr("UiCfg.getValue", {name: name}), loadAceLib());
+		dfd.then(api_getValue);
+
+		// NOTE: to get the ace editor: 
+		//   ed=WUI.getTopDialog()[0].env.editor
+		//   ed.getValue()
+		function api_getValue(data){
+			var jdlg = $('<div title="前端代码"></div>');
+			var ed = ace.edit(jdlg[0]);
+			WUI.showDlg(jdlg, {
 				modal: false,
-				data: {value:data}, forSet: true, // 指定初始值，且只提交修改的内容
 				dialogOpt: {maximized: true},
-				// reload: true, // 每次都重新加载（测试用）
-				url: WUI.makeUrl("UiCfg.setValue", {name: name}),
-				onSubmit: function (data) {
-					eval(data.value); // 不抛异常就好
+				onOk: function () {
+					var data1 = ed.getValue();
+					if (data1 == data) {
+						WUI.closeDlg(jdlg);
+						return;
+					}
+					eval(data1); // 不抛异常就好
+					callSvr("UiCfg.setValue", {name: name}, function () {
+						data = data1; // “应用”模式下，更新原始数据
+						WUI.closeDlg(jdlg);
+						app_show("保存成功!");
+					}, {value: data1});
 				},
-				onOk: 'close'
+				buttons: [
+					{ text: "应用", iconCls: "icon-save", handler: function () {
+						WUI.saveDlg(jdlg, true);
+					}}
+				]
 			})
-		});
+			setTimeout(function () {
+				ed.setOptions({
+					mode: "ace/mode/javascript",
+					//tabSize: 2,
+					enableBasicAutocompletion: true,
+					enableSnippets: true,
+					enableLiveAutocompletion: true
+				});
+				//ed.session.setTabSize(2);
+				ed.setValue(data);
+				ed.clearSelection();
+			});
+		}
 	},
 
 	// e.g. WUI.showPage("pageIframe", "必应", ["http://cn.bing.com"])

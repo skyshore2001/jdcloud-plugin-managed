@@ -20,8 +20,14 @@ var schema = {
 						{
 							title: "链接/代码",
 							type: "string",
-							format: "textarea",
-							description: '示例: <code style="margin-left:10px">http://baidu.com</code> <code style="margin-left:10px">WUI.showPage("pageUi", "物料")</code>'
+							format: "javascript", // "textarea",
+							description: '示例: <code style="margin-left:10px">http://baidu.com</code> <code style="margin-left:10px">WUI.showPage("pageUi", "物料")</code>',
+							options: {
+								input_height: "200px",
+								ace: {
+									minLines: 5,
+								},
+							}
 						},
 						{
 							title: "子菜单",

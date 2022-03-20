@@ -105,52 +105,37 @@ var schema = {
 			},
 
 			onInit: {
-				type: "string",
-				format: "textarea",
-				options: {
-					dependencies: {
-						type: "default"
-					},
-				},
+				$ref: "#/definitions/phpCode",
 			},
 			onQuery: {
-				type: "string",
-				format: "textarea",
-				options: {
-					dependencies: {
-						type: "default"
-					},
-				},
+				$ref: "#/definitions/phpCode",
 			},
 			onValidate: {
-				type: "string",
-				format: "textarea",
-				options: {
-					dependencies: {
-						type: "default"
-					},
-				},
+				$ref: "#/definitions/phpCode",
 			},
 			onValidateId: {
-				type: "string",
-				format: "textarea",
-				options: {
-					dependencies: {
-						type: "default"
-					},
-				},
+				$ref: "#/definitions/phpCode",
 			},
 			userCode: {
-				type: "string",
-				format: "textarea",
-				options: {
-					dependencies: {
-						type: "default"
-					},
-				},
+				$ref: "#/definitions/phpCode",
 			}
 		},
 		defaultProperties: ["name", "class", "type", "allowedAc", "onQuery", "onValidate"]
+	},
+	definitions: {
+		phpCode: {
+			type: "string",
+			format: "php",
+			options: {
+				dependencies: {
+					type: "default"
+				},
+				ace: {
+					mode: {path: "ace/mode/php", inline: true},
+					minLines: 5
+				}
+			},
+		}
 	}
 };
 

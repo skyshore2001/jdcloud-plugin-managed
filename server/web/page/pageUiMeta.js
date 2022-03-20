@@ -22,7 +22,7 @@ function initPageUiMeta()
 		if (row == null)
 			return;
 		WUI.unloadDialog(true);
-		WUI.showPage("pageUi", row.name+"!", [ row.name ]);
+		WUI.showPage("pageUi", row.name+"!");
 	}};
 	jtbl.datagrid({
 		url: WUI.makeUrl("UiMeta.query"),

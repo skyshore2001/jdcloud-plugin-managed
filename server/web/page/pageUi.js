@@ -15,7 +15,7 @@ function initPageUi(opt)
 {
 	var jpage = $(this);
 	var jtbl = jpage.find("#tblUi");
-	var name = opt.title || opt.uimeta;
+	var name = opt.uimeta || opt.title;
 	var jdlg = $("#dlgUi_inst_" + name);
 
 	jpage.addClass("wui-page-" + name);

@@ -10,7 +10,14 @@ var schema = {
 //		headerTemplate: "{{i1}} {{self.name}} {{self.title}}",
 		options: {
 			onNotify: function (val, isManualChange) {
-				return val.title? val.title + '(' + val.name + ')': val.name;
+				var ret = val.title && val.title != val.name? val.title + '(' + val.name + ')': val.name;
+				if (val.pos && val.pos.inline) {
+					ret = "-" + ret;
+				}
+				if (val.pos && val.pos.tab) {
+					ret = "[" + val.pos.tab + "] " + ret;
+				}
+				return ret;
 			}
 		},
 		properties: {
@@ -132,9 +139,12 @@ var schema = {
 			opt: {
 				title: "opt/配置代码",
 				type: "string",
-				format: "textarea",
+				format: "javascript",
 				options: {
 					input_height: "200px",
+					ace: {
+						minLines: 5,
+					},
 					onClick: function (ev) {
 						if ($(ev.target).is(".btnExample")) {
 							var field = this.parent.getValue();

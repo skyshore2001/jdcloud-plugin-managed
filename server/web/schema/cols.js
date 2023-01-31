@@ -68,9 +68,10 @@ var schema = {
 					dependencies: {
 						type: "s"
 					},
+					input_width: "50px"
 
 				},
-				description: "常用20/50/255,更大用text类型,枚举类型常用4或8"
+				description: "4/20/50/255"
 			},
 			linkTo: {
 				title: "链接",
@@ -94,5 +95,4 @@ var schema = {
 ({
 	schema: schema,
 	no_additional_properties: true,
-	show_opt_in: false
 })

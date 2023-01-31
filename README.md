@@ -14,10 +14,6 @@
 
 	./tool/jdcloud-plugin.sh add ../jdcloud-plugin-jsonEditor
 
-插件会自动添加bootstrap库到文件系统。在server/web/store.html中添加引入bootstrap库用于美化编辑器风格：
-
-	<link rel="stylesheet" type="text/css" href="lib/bootstrap.min.css" />
-
 然后安装本插件：
 
 	./tool/jdcloud-plugin.sh add ../jdcloud-plugin-managed
@@ -92,19 +88,29 @@ DiMeta可用于更新数据库表以及生成AC类，该过程称为meta同步(m
 - 托管接口如何重新部署？
 
 开发原生接口时，meta是定义在DESIGN文档中的，开发时通过tool/upgrade.sh工具来更新数据库，部署时通过生成meta文件，然后在线访问tool/init.php页面或tool/upgrade/页面来更新数据库。
-在开发好托管接口后，应将数据库中meta相关表导出（SQL文件），做为初始化数据，TODO 然后通过upgrade工具更新到数据库，同时调用同步接口生成托管页面（目前先手工来做导入和调用同步接口）。
+在开发好托管接口后，应将所有数据模型、页面、菜单、代码等导出，称为“导出Addon安装包”，然后在目标环境下安装。
+
+具体操作：打开菜单【系统设置-开发-数据模型】，工具栏按钮【管理Addon】，选择下拉菜单【导出安装包】或【自动安装】。详情参考[部署Addon]。
 
 ### 原生页面与托管页面
 
 UiMeta用于定义托管页面。
 
-前端通过`WUI.showPage("pageUi_inst_{UiMeta名}")来打开列表页，通过`WUI.showDlg`WUI.showObjDlg("pageUi_inst_{UiMeta名}")`来打开对象对话框。
+管理端通过`WUI.showPage("pageUi", {uimeta: UiMeta名, title: title})`来打开列表页(如果未指定uimeta，则使用title当作uimeta)，通过`WUI.showDlg`WUI.showObjDlg("pageUi_inst_{UiMeta名}")`来打开对象对话框。
 在初次执行时，它获取uimeta，自动渲染页面。
 
 托管页面被设计成可以与原生一起执行，意味着它具有与原生相同的能力。托管的代码可以直接调用原生代码。
-(TODO: 页面要定制怎么办？比如两个表？ 答：这里特指对象模型页面，要定制任意页面用原生）
 
 注意：托管页面不生成原生代码，而是直接根据uimeta自动渲染。这与托管接口将dimeta生成AC类的实现方式不同，这也导致了托管页面在显示时效率低一些（多了获取uimeta和动态渲染的步骤）。
+
+**【定制页面】**
+
+目前托管页面提供的典型的CRUD功能。
+
+如果非CRUD页面，首先考虑是否可以借助一些通用页面，比如要展示一个定制报表，可用到pageSimple页面，或更高级的WUI.showDataReport函数（自定义报表、多维分析）等；
+如果等一个页面中展示多个表，甚至多个tab页，考虑使用pageTab页面。请参考[前端文档](http://oliveche.com/jdcloud-site/api_web.html#pageSimple)。
+
+如果仍无法满足需求，则须使用原先开发，制做新的页面或对话框，然后可以在托管代码中（包括定制菜单中）用WUI.showPage/WUI.showDlg来调用它们。
 
 ### UDF设计
 
@@ -162,7 +168,9 @@ WUI提供了扩展对象WUI.UDF，在uimeta.js中实现了它的相关方法。
 托管接口定义：
 
 @DiMeta: id, name, manageAcFlag, title, cols(t), vcols(t), subobjs(t), acLogic(t)
-subobj: uiMeta
+
+vcol
+: @uiMeta
 
 - manageAcFlag: Enum(0-不生成接口,1-独立接口,2-扩展接口)
 
@@ -172,79 +180,99 @@ subobj: uiMeta
 - @vcols: [{@res, join, default, require}]
 	- @res=[{def, name, title}]
 - @subobjs: [{name, title obj, cond, res, default, wantOne}]
-- @acLogic: [{class, name, type, ...}]
-	- class: Enum(AC0, AC1, AC2)
-	- type="AC", ...={@allowedAc, @readonlyFields, @readonlyFields2, @requiredFields, @requiredFields2, onInit, onQuery, onValidateId, onValidate, userCode}
+- @acLogic: [{class, @allowedAc, @readonlyFields, @readonlyFields2, @requiredFields, @requiredFields2, onInit, onQuery, onValidateId, onValidate, userCode}]
+	- class: 指定类名，常用为AC0/AC1/AC2。特别地，对于继承关系，比如当前类为InvRecord(库存记录)有子类InvOrder(库存请求)，则应创建AC2_InvOrder类，才能正常使用该子类。
 
 关于链接字段：
 
 - 当cols.type=i(整数)且名为`xxxId`形式时，linkTo可以链接到其它表，如"ShopItem.name"。它将自动创建虚拟字段，假如字段名为itemId，则它创建虚拟字段"item.name itemName / LEFT JOIN ShopItem item ON item.id=t0.itemId".
 在自动创建页面字段时，列表字段自动生成，对话框字段将以combogrid来展示。
 
+#### 自定义函数逻辑 - acLogic
+
+acLogic.class设置之后的代码生成到哪个类。默认用AC0，然后AC1（用户端）或AC2（管理端）都会继承它。如果只在管理端用，也可以直接指定用AC2类。
+
+通过acLogic.onValidate等函数可以定制后端逻辑；
+要特别注意的是，如果是对已有对象进行扩展（manageAcFlag=2），回调函数的执行时机，默认是在系统对象相应回调函数之后。
+
+以onValidate为例，比如导入工单时，物料名称（itemName）中包含有"?"号，想自动替换为空格，可以设置：
+
+	if ($this->ac == "add" && issetval("itemName")) {
+		$_POST["itemName"] = str_replace("?"," ",$_POST["itemName"]);
+	}
+
+它将在系统处理逻辑之后再执行扩展逻辑。
+
+如果想先执行扩展逻辑再做系统逻辑：
+
+	... // 扩展逻辑代码，在系统默认逻辑之前执行
+	parent::onValidate();
+	... // 扩展逻辑代码，在系统默认逻辑之后执行
+
+如果只要扩展逻辑，不要系统逻辑：
+
+	... // 扩展逻辑代码
+	// 下面一行注释掉，而不是删掉；因为要出现parent::字样系统才不会先执行默认逻辑。
+	//parent::onValidate();
+
+acLogic.userCode字段中可以扩展AC类的成员变量或成员函数，用于在onValidate等回调函数中调用，比如：
+
+	function hello() {
+		addLog("hello");
+	}
+
+然后在onValidate中可调用：
+
+	$this->hello();
+
 ### 托管页面
 
 托管页面定义：
 
 @UiMeta: id, name, diId, obj(s), fields(t), defaultFlag
-vcol: diName(DiMeta.title), obj(DiMeta.name)
-vcol for search: isUdf(DiMeta.manageAcFlag=2)
+
+vcol
+: diName(DiMeta.title), obj(DiMeta.name)
+
+vcol for search
+: isUdf(DiMeta.manageAcFlag=2)
 
 - diId: 关联DiMeta
 - obj: 在未关联diId时，使用该字段指定对象名。默认为DiMeta.name。
 - name: 页面名，可以是中文; 默认为DiMeta.title。
 - defaultFlag: 为1时，由DiMeta自动维护，在管理端上做DiMeta同步时会更新或创建它。
 
-- @fields: field/uicol={name, title, type, uiType, opt, notInList, linkTo?, uiMeta?}
+- @fields: field/uicol={name, title, type, uiType, opt, notInList, linkTo?, uiMeta?, pos?, listSeq?}
 
 	- uiType: Enum(text/json, combo/combo-simple/combo-db/combogrid, file, subobj, null-不显示)
 	- opt: 是一段JS代码（不是JSON），它将被执行做为每个字段的选项，其执行结果是一个对象。根据uiType不同，opt中需要的内容也不同。
-		通用opt: {%attr, %style, class}
-	- notInList: Boolean.
+		通用opt: {%attr, %style, class, desc} + WUI.setDlgLogic中支持的选项(如disabled, valueForAdd等)
+		- dscr: 字段说明，将显示在字段下方
+	- notInList: Boolean. 指定不显示在列表中。
 	- uiMeta: 仅用于uiType=subobj，链接UiMeta.name
 	- pos: 对话框中排版设置。示例：{tab:"基本",group:"-",inline:true,extend:1}
 		- tab: 指定在哪个tab页。如果不指定则在对话框上方。
 		- group: 指定在哪个组。如果不指定则在默认上方组；如果指定为"-"表示没有组名。
 		- inline: 如果为true，表示使用多列布局，该组件接上一组件，不换行。
 		- extend: 在多列布局中，指定扩展几列。值为1表示占用2列(colspan=3)；值为2表示占用3列(colspan=5)。
+	- listSeq: Integer. 指定列顺序号，如果不指定，则与上一个相同，如果是第1个字段，不指定时默认为1。
 
 #### 通用选项
 
-- opt.attr 设置属性。例如多行文本字段可设置`{rows:3}`指定行数
+字段的通用选项如下：
 
-- opt.style 设置样式
-
-- opt.class 设置类
-
+- opt.attr: 设置属性。例如多行文本字段可设置`{rows:3}`指定行数
+- opt.style: 设置样式。例如`{width: "100%"}`
+- opt.class: 设置CSS类, 多个类以空格分隔，如`jdcloud-plugin-ueditor`, `mybutton mybutton-primary`
+- opt.desc: 设置描述信息(hint)，一般在字段下方以蓝色小字出现。
 - opt.required 为1表示必填
-
 - opt.validType 用于文本框，验证方式。
 
-控制显示、禁用、只读及初始值，可以区分添加还是更新模式：
-示例：
-
-	{
-		show: false,
-		showForAdd: false, // 默认是显示
-		showForSet: e => e.status == "CR", // 返回bool，根据其它值判断
-
-		disable: true,
-		disableForAdd: true,
-		disableForSet: true,
-
-		readonly: true,
-		readonlyForAdd: true,
-		readonlyForSet: true,
-
-		value: (e, it) => e.code + "-" + e.name,
-		valueForAdd: () => new Date().format("D"), // 返回当前日期
-
-		onChange: (v, it) => it("title").val(v),
-		setOption: e => ListOptions.ItemGrid({type: e.type})
-	}
+详细参考[http://oliveche.com/jdcloud-site/ref-addon.html#字段选项配置opt]().
 
 #### 文本框(uiType=text)
 
-如果type=s，默认以input来展现；如果type=t，或长度大于200，则以textarea来展现。
+如果type=s，默认以input来展现；如果type=t，或长度大于200，或指定选项`format:"textarea"`，则以textarea来展现。
 
 #### JSON配置框(uiType=json)
 
@@ -277,7 +305,7 @@ vcol for search: isUdf(DiMeta.manageAcFlag=2)
 	}
 
 其中，Formatter是全局变量，可直接使用。
-在前端加载后，它将被执行，之后可从`g_data.uiMeta.pages[页面名][字段名]`来访问到它。
+在前端加载后，它将被执行，之后可从`UiMeta.metaMap.页面名.字段名`来访问到它。
 
 往往此处的enumMap定义在其它地方也会用到，这时可通过共享选项(ctx变量)在多处脚本中共享它，上面模板中被注释的一行就是使用ctx例子。如果要共用，则会像这样定义字段选项：
 
@@ -286,18 +314,18 @@ vcol for search: isUdf(DiMeta.manageAcFlag=2)
 		...
 	}
 
-然后在配置共享选项ctx: 
+共用的选项、函数等可配置`UiMeta.ctx`：
 
-	{
+	$.extend(UiMeta.ctx, {
 		OrderStatusMap: {
 			CR: "新创建", 
 			PA: "待服务", 
 			RE: "已服务"
 		},
 		...
-	}
+	});
 
-共享选项在前端实现时，用的是`ctx=g_data.uiMeta.options`。
+按惯例，一个页面内多处共用的内容写在id字段配置选项中，多个页面都共用的内容则配置在前端代码中。
 
 前端实现：
 
@@ -385,7 +413,13 @@ vcol for search: isUdf(DiMeta.manageAcFlag=2)
 	对话框中：
 	<select name="empId" class="wui-combogrid" data-options="opt.combo"></select>
 
-TODO: 后端实现：qsearch
+后端实现：qsearch
+为支持模糊查询，须在【系统设置-开发-数据模型】中打开模型对话框，配置【AC逻辑】，添加后端代码，在【onQuery】中添加：
+
+	$this->qsearch(["id","code","name"], param("q"));
+
+这表示在id, code和name三个字段中（这个按需修改）进行模糊查询，查询参数使用`q`（这个一般不改）。
+
 
 示例：当选择了一个工件(snId, 使用combogrid组件)后，自动填充工单(orderId, 使用combogrid组件)、工单开工时间(actualTm)等字段。
 
@@ -507,19 +541,26 @@ TODO: 后端实现：qsearch
 
 	[
 		{name: "运营管理", value: [
-			{name: "测试1", value: "测试1"},
-			{name: "-订单管理", value: ""}
+			{name: "物流订单", value: "WUI.showPage(\"pageUi\", \"物流订单\")"},
+			{name: "-订单管理", value: ""},
+			{name: "官网", value: "http://oliveche.com"},
 		]},
-		{name: "新菜单组", value: [
-			{name: "测试1", value: "测试1"}
+		{name: "统计分析", icon: "fa-bar-chart", value: [
+			{name: "订单分析", value: "..."}
 		}
 	]
 
 如果第一级菜单名在原菜单中存在，则做合并处理，否则新增该菜单。
 
-如果菜单名为"-"开头，表示删除当前层级下某个已有菜单项。
+对于一级菜单，无论是系统已有菜单还是自定义菜单，顺序与列表中的顺序一致，
+比如当前系统菜单为"系统设置 运营管理"，自定义菜单为"主数据管理 运营管理 订单菜单", 则"主数据管理"菜单会添加到系统已有的"运营管理"之前。
+自定义的二级菜单则依次排在原系统菜单之下。
 
-TODO: order属性: 指定菜单项顺序值，呈现时由小到大排序，在不指定时（包括系统默认的菜单项，是未指定顺序的），则同一级依次为100, 200, 300, ...
+如果菜单名为"-"开头，表示不显示当前层级下某个已有的系统菜单项。
+
+通过icon可以指定图标，图标使用font awesome库，不指定时默认为"fa-pencil-square-o"。
+名字与图标对应参考这里：
+http://www.fontawesome.com.cn/icons-ui/
 
 ## 后端接口
 
@@ -527,31 +568,33 @@ TODO: order属性: 指定菜单项顺序值，呈现时由小到大排序，在�
 
 	DiMeta.add
 
-- TODO manageAcFlag=1时，如果系统中已有AC2类，则不允许创建。
+- manageAcFlag=1（创建新对象）或2（扩展系统已有对象）。注意如果系统中已有该类，必须用manageAcFlag=2来扩展，否则无法生效。
 	
 	DiMeta.get/query
 
 	DiMeta.set...
 
-- name不允许修改。TODO: 若要支持改name，数据库表要在同步时改名。
+- name不允许修改。因为它已关联数据库表。
 
 	DiMeta.del...
 
-- TODO: del时删除表和AC类？暂时留做手工操作。
+- 注意：del接口不删除该DiMeta对应的数据库表。但会删除它对应的AC类。
 
 DiMeta同步：
 
-	DiMeta.sync(id, noSyncDb?, force?)
+	DiMeta.sync(id)
+	DiMeta.syncAc(meta)
+	DiMeta.diff(id)
 
-- 与数据库做同步，创建表或更新字段。
-	注意默认不会删除或修改字段类型，除非加force=1标志。因为字段可能用了一段时间，很可能需要手工升级后才能删除或调整，TODO 做这些操作须调用DiMeta.diff接口后得到SQL语句，去数据库手工执行。
+- sync接口先更新数据库，创建表或更新字段，然后若manageAcFlag=1，则创建或更新相应的后端AC类到php/class/ext/目录；（删除由DiMeta.del接口完成，不在sync接口中）
+	注意默认不会删除或修改字段类型。因为字段可能用了一段时间，很可能需要手工升级后才能删除或调整，做这些操作须调用DiMeta.diff接口后得到SQL语句，去数据库手工执行
+	具体操作：打开菜单【系统设置-开发-数据模型】，工具栏按钮【同步】，选择下拉菜单【字段差异】。
 
-- 如果指定参数noSyncDb=1，则不刷新数据库，只重新创建后端AC类。
-- 若manageAcFlag=1，则创建或更新相应的AC类。（删除由DiMeta.del接口完成，不在sync接口中）
+- syncAc接口只创建后端AC类。
 
 	DiMeta.syncAll()
 
-- 清空php/class下所有不在git管理下的AC开头文件。
+- 清空托管的AC类（php/class/ext目录下所有php文件）
 - 分别同步每个DiMeta
 
 清除addon：
@@ -596,9 +639,19 @@ UiMeta全局配置配置
 	var url = WUI.makeUrl("UiCfg.getValue", {name: "h5code", _raw:1});
 	WUI.loadScript(url)
 
-## 部署
+## 部署Addon
 
-扩展应用（Addon）存储在开发数据库中。可以通过命令行和在线执行两种方式来部署Addon。
+扩展应用（Addon）存储在开发数据库中。通过从开发环境导出addon，然后导入addon到其它服务器，实现部署。
+
+具体操作：打开菜单【系统设置-开发-数据模型配置】，工具栏按钮【管理Addon】，选择下拉菜单【导出安装包】或【自动安装】。
+前者导出Addon到xml文件，默认位置为server/upgrade/tool/addon.xml，可以下载或直接提交到代码库中。
+后者将该addon.xml文件导入，实现addon的安装部署。
+
+其底层通过upgrade-addon.php工具来实现。
+
+### Addon部署的底层实现
+
+可以通过命令行和在线执行两种方式来部署Addon。
 
 核心程序是 
 
@@ -651,6 +704,12 @@ UiMeta全局配置配置
 		db_home: env 
 		#db_home: env windows cygwin desc
 
+- 在通过HTTP调用upgrade-addon程序时支持fmt=json参数，可返回筋斗云兼容的json格式，示例：
+
+		http://{baseurl}/tool/upgrade-addon.php/install?fmt=json
+
+- 脚本使用虚拟管理员（empId=-1）进行操作。
+
 ### 打包
 
 	php server/tool/upgrade-addon.php
@@ -687,55 +746,47 @@ UiMeta全局配置配置
 
 可以在其它字段的逻辑里一起修改。目前onWatch回调提供gn函数可以操作任意字段。
 
-如果想完全控制对话框逻辑，可以监听对话框相关事件。示例：隐藏系统已有的订单对话框上的“描述”字段。
+如果想完全控制对话框逻辑，可以监听对话框相关事件，比如create/beforeshow/show/validate/retdata等事件。
+系统提供了安全又方便的UiMeta.on函数，支持在控制台中反复调试执行；在二次开发调试时，会反复修改代码，建议可以先在控制台中输入代码段来直接测试。
 
-	$(document).on("create", "#dlgOrder", function (ev) {
+示例：隐藏系统已有的订单对话框上的“描述”字段。
+
+	UiMeta.on("create", "dlgOrder", function (ev) {
 		var jdlg = $(ev.target);
 		WUI.setDlgLogic(jdlg, "dscr", {show: false});
 	});
 
 或者：
 
-	$(document).on("show", "#dlgOrder", function (ev, formMode, initData) {
+	UiMeta.on("show", "dlgOrder", function (ev, formMode, initData) {
 		var jdlg = $(ev.target);
 		jdlg.gn("dscr").visible(false);
 	});
 
 上面代码可以打开菜单`开发-前端代码`，加入其中。
 
-在Addon开发时，调试会反复修改代码，可以先在控制台中执行它。
-为了避免事件重复绑定造成重复执行，建议每次绑定事件(on)前先解除绑定(off)，
-而为了避免影响所有的同类事件，建议用jquery事件的namespace特性去限定事件名。
+注意如果是自定义对象，比如“商品”对话框，则使用`dlgUi_inst_商品`这样的名字来访问对话框，示例：
 
-上述代码的最佳实践写法为：
-
-	$(document).off("create.dlgOrder").on("create.dlgOrder", "#dlgOrder", dlgOrder_onCreate);
-	function dlgOrder_onCreate(ev) {
-		var jdlg = $(ev.target);
-		WUI.setDlgLogic(jdlg, "dscr", {show: false});
-	}
-
-用带限定的事件名`create.dlgOrder`来替代`create`事件，先off再on避免重复绑定。
-
-注意如果是自定义对象，比如“商品”对话框，则以`#dlgUi_inst_商品`来访问对话框，示例：
-
-	$(document).off("create.商品").on("create.商品", "#dlgUi_inst_商品", 商品_onCreate);
-	function 商品_onCreate(ev) {
+	UiMeta.on("create", "dlgUi_inst_商品", function (ev) {
 		var jdlg = $(ev.target);
 		WUI.setDlgLogic(jdlg, "name", {
 			readonlyForSet: true
 		});
-	}
+	});
 
 这等价于在页面字段"name"上设置readonlyForSet属性。
+
+如果只是想隐藏已有字段，或是修改字段的标题，也可以在页面字段列表中添加要修改的已有字段并配置标题，或是不显示（uiType不选就是不显示）。
+此方法也适用于调整列表中列的标题和显示顺序（参考[定制列表显示顺序]）。
+
+不支持定制对话框上已有字段的顺序，有此需求建议直接修改源码。
 
 ### 如何定制列表页上的操作按钮？比如点击显示关联对象，或做设置操作。
 
 处理dg_toolbar事件，匹配当前页面对象。
 示例：在自定义的商品页面上，加上“关联订单”按钮。
 
-	$(document).off("dg_toolbar.商品").on("dg_toolbar.商品", ".wui-page-商品", 商品_onToolbar);
-	function 商品_onToolbar(ev, buttons, jtbl, jdlg) {
+	UiMeta.on("dg_toolbar", "商品", function (ev, buttons, jtbl, jdlg) {
 		// var jpage = $(ev.target);
 		// console.log(jpage);
 		var btnLinkToOrder = {text: "关联订单", iconCls: "icon-redo", handler: function () {
@@ -746,16 +797,15 @@ UiMeta全局配置配置
 			WUI.showPage("pageOrder", "关联订单-" + row.name, [null, pageFilter] );
 		}};
 		buttons.push(btnLinkToOrder);
-	}
+	});
 
 参考demo2管理端入门学习案例，关联操作的设计模式有好几种，除了在工具栏菜单，也可在单元格中点击关联对象的数目等，这可以设置相应组件的formatter方法。
 
 以上代码加到菜单`开发-前端代码`中。
 
-注意：如果是系统页面，需要用选择器".wui-page.pageOrder"来匹配页面，如：
+注意：如果是系统页面，则用原页面名"pageOrder"来匹配页面，如：
 
-	$(document).off("dg_toolbar.pageOrder").on("dg_toolbar.pageOrder", ".wui-page.pageOrder", pageOrder_onToolbar);
-	function pageOrder_onToolbar(ev, buttons, jtbl, jdlg) {
+	UiMeta.on("dg_toolbar", "pageOrder", function (ev, buttons, jtbl, jdlg) {
 		// var jpage = $(ev.target);
 		// console.log(jpage);
 		var btnLinkToItem = {text: "关联商品", iconCls: "icon-redo", handler: function () {
@@ -766,7 +816,7 @@ UiMeta全局配置配置
 			PageUi.show("商品", "关联商品-订单"+row.id, pageFilter);
 		}};
 		buttons.push(btnLinkToItem);
-	}
+	});
 
 ### 共用页面如何实现？
 
@@ -785,8 +835,7 @@ UiMeta全局配置配置
 
 要动态设置表格字段，建议也是监听dg_toolbar事件，用setTimeout等待数据表初始化次做设定。
 
-	$(document).off("dg_toolbar.pageOrder").on("dg_toolbar.pageOrder", ".wui-page.pageOrder", pageOrder_onToolbar)
-	function pageOrder_onToolbar(ev, buttons, jtbl, jdlg) {
+	UiMeta.on("dg_toolbar", "pageOrder", function (ev, buttons, jtbl, jdlg) {
 		var jpage = $(ev.target);
 		// 传title参数给关联的对话框
 		jdlg.objParam = {
@@ -803,7 +852,7 @@ UiMeta全局配置配置
 				qty: type == "商品"
 			});
 		}
-	}
+	});
 
 ### 如何自定义报表并加入菜单？
 
@@ -865,4 +914,43 @@ UiMeta全局配置配置
 	字段b3: pos.tab=分页2, pos.group="-", pos.extend=1 （指定分组但无名字）
 
 注意：也可以所有字段都在分组中的。
+
+### 定制列表显示顺序
+
+二次开发页面上字段的顺序，已经决定了列表和对话框中的显示顺序。如果希望定制列表中列序（与对话框中顺序不同），还可以通过“列顺序号(listSeq)”属性来设置。
+
+默认情况下，所有字段未指定列顺序，则第1列的顺序号为1，其它列与上1列顺序号相同，也可以指定顺序号，示例：
+
+	a1, a2, a3, a4
+	(顺序号为：1,1,1,1)
+
+	a1, a2(listSeq=10), a3(listSeq=2), a4
+	(顺序号为：1,10,2,2, 实际顺序为 a1, a3, a4, a2，即把a3移到a2之前)
+
+也支持为一次开发中的已有列表定制顺序。示例：
+
+	原列表字段：c1, c2, c3, c4
+	二次开发字段: a1, a2, a3, a4
+	实际顺序：c1, c2, c3, c4, a1, a2, a3, a4
+
+把a2放到c1和c2间：
+
+	二次开发字段: a1(listSeq=2), a2(seq=1), c2, a3(listSeq=10), a4
+	实际顺序：c1, a2, c2, c3, c4, a1, a3, a4
+
+在字段配置时，可以点击“列顺序号”下方的“配置列顺序”，打开列顺序编辑工具，方便地自动生成listSeq.
+
+如果不想显示某字段，设置“不在列表中显示”即可。(notInList=true)
+
+
+### 关于继承关系的配置 / 共用表
+
+示例：InvOrder(库存请求)与InvRecord(库存记录)共同使用表InvRecord。在产品代码中AC2_InvOrder继承AC2_InvRecord。
+
+二次开发在做扩展时，应注意：
+
+- 只能设置表即InvRecord，而不能设置InvOrder。
+- 数据模型中，必须在AC逻辑中添加类AC2_InvOrder，否则无法扩展该类。
+- 前端页面(pageInvRecord)的列表(table组件)上，必须设置"my-obj=InvRecord"来指定基础对象，否则在显示InvOrder时将无法加载udf扩展字段；
+类似地，在对话框(dlgInvRecord)上也需要指定"my-obj=InvRecord"，好在这里一般都会指定。
 

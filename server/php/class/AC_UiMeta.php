@@ -35,6 +35,8 @@ class AC0_UiMeta extends AccessControl
 				// TODO: 此处应避免相互引用成环导致死循环
 				foreach ($ret as &$field) {
 					if ($field["uiType"] == "subobj") {
+						if (!$field["uiMeta"])
+							jdRet(E_PARAM, null, "UiMeta页面[" . $row["name"] . ']-字段[' . $field["name"] . "]定义错误: uiMeta不可为空");
 						$field["uiMeta"] = callSvcInt("UiMeta.get", ["name" => $field["uiMeta"], "for"=>"exec"]);
 					}
 				}
@@ -45,7 +47,17 @@ class AC0_UiMeta extends AccessControl
 	}
 }
 
+class AC_UiMeta extends AC0_UiMeta
+{
+	protected $allowedAc = ["get", "query"];
+}
+
 class AC2_UiMeta extends AC0_UiMeta
 {
+	protected function onInit() {
+		if (!in_array($this->ac, ["get", "query"]))
+			checkAuth(PERM_MGR);
+		parent::onInit();
+	}
 }
 

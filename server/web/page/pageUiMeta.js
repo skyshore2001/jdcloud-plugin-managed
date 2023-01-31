@@ -4,19 +4,6 @@ function initPageUiMeta()
 	var jtbl = jpage.find("#tblUiMeta");
 	var jdlg = $("#dlgUiMeta");
 
-/*
-	// 定制工具栏增删改查按钮：r(refresh), f(find), a(add), s(set), d(del)
-	jtbl.jdata().toolbar = "rfs";
-	// 自定义按钮
-	var btn1 = {text: "结算明细", iconCls:'icon-ok', handler: function () {
-		var row = WUI.getRow(jtbl);
-		if (row == null)
-			return;
-		var objParam = {closeLogId: row.id};
-		WUI.showPage("pageOrder", "结算明细-" + row.id, [ objParam ]);
-	}};
-*/
-
 	var btnShowPage = {text: "页面测试", iconCls:'icon-ok', handler: function () {
 		var row = WUI.getRow(jtbl);
 		if (row == null)

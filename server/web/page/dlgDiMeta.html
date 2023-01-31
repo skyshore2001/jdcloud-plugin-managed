@@ -1,31 +1,32 @@
-<form my-obj="DiMeta" title="数据模型" style="width:450px;height:600px;" wui-script="dlgDiMeta.js" my-initfn="initDlgDiMeta">
+<form my-obj="DiMeta" title="数据模型" style="width:600px;height:600px;" wui-script="dlgDiMeta.js" my-initfn="initDlgDiMeta">
 	<table>
 		<tr>
 			<td>编号</td>
 			<td>
 				<input name="id" disabled>
 			</td>
+
+			<td>生成托管接口</td>
+			<td>
+				<select name="manageAcFlag" class="my-combobox" data-options="jdEnumMap:{0:'否',1:'是',2:'扩展'}"></select>
+				<p class="hint">新模型选“是”，系统已有模型须选“扩展”。</p>
+			</td>
 		</tr>
+
 		<tr>
 			<td>对象名</td>
 			<td>
 				<input name="name" class="easyui-validatebox" required>
 				<p class="hint">对应数据库表名和交互接口名，如"Item", "Ordr"等</p>
 			</td>
-		</tr>
-		<tr>
-			<td>生成托管接口</td>
-			<td>
-				<select name="manageAcFlag" class="my-combobox" data-options="jdEnumMap:{0:'否',1:'是',2:'扩展'}"></select>
-			</td>
-		</tr>
-		<tr>
+
 			<td>显示名</td>
 			<td>
 				<input name="title" >
 				<p class="hint">对象描述，如“物料”，“工单”等</p>
 			</td>
 		</tr>
+
 		<tr>
 			<td>字段</td>
 			<td class="wui-jsonEditor cols" data-options="schema:'schema/cols.js', input:false">
@@ -36,8 +37,7 @@
 					<a class="easyui-linkbutton btnFormat" data-options="iconCls: 'icon-reload'" href="javascript:;">格式化</a>
 				</p>
 			</td>
-		</tr>
-		<tr>
+
 			<td>虚拟字段</td>
 			<td class="wui-jsonEditor" data-options="schema:'schema/vcols.js', input:false">
 				<textarea name="vcols"  rows=3></textarea>
@@ -48,6 +48,7 @@
 				</p>
 			</td>
 		</tr>
+
 		<tr>
 			<td>子表</td>
 			<td class="wui-jsonEditor" data-options="schema:'schema/subobjs.js', input:false">
@@ -58,9 +59,7 @@
 					<a class="easyui-linkbutton btnFormat" data-options="iconCls: 'icon-reload'" href="javascript:;">格式化</a>
 				</p>
 			</td>
-		</tr>
 
-		<tr>
 			<td>AC逻辑</td>
 			<td class="wui-jsonEditor" data-options="schema:'schema/acLogic.js', input:false">
 				<textarea name="acLogic"  rows=3></textarea>
@@ -86,7 +85,7 @@
 	</div>
 </form>
 <!-- examples:
-<input name="name" class="easyui-validatebox" data-options="required:true">
+<input name="name" class="easyui-validatebox" required>
 <select name="customerId" class="my-combobox" data-options="ListOptions.Customer()"></select>
 <select name="status" class="my-combobox" data-options="jdEnumMap:OrderStatusMap"></select>
 -->

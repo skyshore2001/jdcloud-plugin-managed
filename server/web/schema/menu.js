@@ -14,6 +14,11 @@ var schema = {
 					type: "string",
 					required: true
 				},
+				icon: {
+					title: "图标",
+					type: "string",
+					description: '<a target="_blank" href="http://www.fontawesome.com.cn/icons-ui/">选择图标</a>，示例：fa-pencil-square-o',
+				},
 				value: {
 					title: "值",
 					oneOf: [

@@ -21,7 +21,7 @@ function initDlgDiMeta()
 				{name: "code", title: "编码"},
 				{name: "name", title: "名称"},
 				{name: "tm", title: "创建时间", type: "tm"},
-				{name: "empId", title: "创建人", type: "i"},
+				{name: "empId", title: "创建人", linkTo: "Employee.name", type: "i"},
 			]);
 			/*
 			opt.data.vcols = JSON.stringify([

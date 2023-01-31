@@ -10,7 +10,11 @@ class AC0_UiCfg extends AccessControl
 
 	function api_setValue() {
 		$name = mparam("name", "G");
-		$value = mparam("value", "P", false);
+		$value = $_POST["value"];
+		if (is_null($value))
+			jdRet(E_PARAM, "require value");
+		if ($value === "")
+			$value = null;
 		$id = queryOne("SELECT id FROM UiCfg", false, ["name" => $name]);
 		if ($id === false) {
 			dbInsert("UiCfg", ["name" => $name, "value" => dbExpr(Q($value))]);
@@ -56,4 +60,9 @@ class AC_UiCfg extends AC0_UiCfg
 
 class AC2_UiCfg extends AC0_UiCfg
 {
+	protected function onInit() {
+		if (!in_array($this->ac, ["script", "query", "getValue"]))
+			checkAuth(PERM_MGR);
+		parent::onInit();
+	}
 }

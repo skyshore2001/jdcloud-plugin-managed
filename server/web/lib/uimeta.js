@@ -12,7 +12,18 @@ var UiMeta = {
 			return;
 		}
 
-		callSvr("UiMeta.get", {name: name, for: "exec"}, api_UiMetaGet, {sync: sync});
+		// uimeta以"meta"开头表示从文件加载，示例：WUI.showPage("pageUi", {uimeta:"metaApproveRec", title:"审批记录"}) 
+		if (name.startsWith("meta")) {
+			var metaUrl = "page/" + name + ".js";
+			WUI.loadJson(metaUrl, function (uiMeta) {
+				uiMeta.name = name;
+				api_UiMetaGet(uiMeta);
+			}, {async: !sync});
+		}
+		// 后端加载meta, 示例：WUI.showPage("pageUi", {uimeta:"审批记录", title:"审批记录"}) 
+		else {
+			callSvr("UiMeta.get", {name: name, for: "exec"}, api_UiMetaGet, {sync: sync});
+		}
 
 		function api_UiMetaGet(uiMeta) {
 			UiMeta.initUiMeta(uiMeta);
@@ -24,11 +35,20 @@ var UiMeta = {
 		$.each(uiMeta.fields, function (i, field) {
 			if (!field.title)
 				field.title = field.name;
-			if (field.opt && typeof(field.opt) === "string") {
+			if (typeof(field.opt) === "string") {
 				field.opt = WUI.evalOptions(field.opt, ctx) || {};
 			}
-			else {
+			else if (field.opt == null) {
 				field.opt = {};
+
+				// 设置组件默认参数
+				if (field.uiType == "upload") {
+					if (field.title.match(/附件|att/)) {
+						field.opt.pic = false;
+						if (! field.title.match(/Id$/))
+							field.opt.fname = 1;
+					}
+				}
 			}
 			if (field.linkTo && (field.uiType == "combo-db" || field.uiType == "combogrid")) {
 				if (!field.opt || !field.opt.combo) {
@@ -61,26 +81,80 @@ var UiMeta = {
 
 	// return: @columns
 	addColByMeta: function (columns, uiMeta) {
-		$.each(uiMeta.fields, function (i, field) {
-			if (field.notInList)
+		var doSort = false;
+		var seq = 1;
+		var fields = $.map(uiMeta.fields, function (field) {
+			if (field.notInList) {
+				// 二次开发可删除原列表中已有字段
+				var idx = columns.findIndex(e => e.field == field.name);
+				if (idx >= 0)
+					columns.splice(idx, 1);
 				return;
-			addCol(this);
+			}
+			if (field.type == "subobj")
+				return;
+			// listSeq不指定时，与上1个相同，第1个字段默认值为1.
+			if (field.listSeq == null) {
+				field.listSeq = seq;
+			}
+			else {
+				seq = field.listSeq;
+				doSort = true;
+			}
+			return field;
 		});
+		// 只要有指定listSeq则排序
+		if (doSort) {
+			fields.sort((a,b) => a.listSeq - b.listSeq);
+		}
+		/* 二次开发与一次开发字段可一起排序，示例ax为一次字段，bx为二次字段
+		columns    ; fields
+		-----------;----------
+		a1,a2,a3,a4; b1,a2,b2 => a1,(b1,a2), a3,a4, b2
+		a1,a2,a3,a4; b1,a2,b2,a3 => a1,(b1,a2),(b2,a3), a4
+		*/
+		if (columns.length == 0) {
+			$.each(fields, function (i, field) {
+				addCol(this);
+			});
+		}
+		else {
+			var fieldIdx = 0, colIdx = 0;
+			while (colIdx<columns.length) {
+				var fieldIdx1 = fields.findIndex(f => f.name == columns[colIdx].field);
+				if (fieldIdx1 >= 0) {
+					for (var j=fieldIdx; j<fieldIdx1; ++j) {
+						if (addCol(fields[j], colIdx))
+							++ colIdx;
+					}
+					setCol(fields[fieldIdx1], colIdx);
+					++ colIdx;
+					fieldIdx = fieldIdx1 +1;
+				}
+				else {
+					colIdx ++;
+				}
+			}
+			for (var j=fieldIdx; j<fields.length; ++j) {
+				addCol(fields[j]);
+			}
+		}
 		return columns;
 
-		function addCol(field) {
+		// 返回true表示实际已添加
+		function addCol(field, colIdx) {
 			var col = {
 				field: field.name,
-				title: field.title,
+				title: field.title || field.name,
 				formatter: field.opt && field.opt.formatter,
 				styler: field.opt && field.opt.styler,
 				sortable: true
 			};
 			if (field.type == "i") {
-				field.sorter = intSort;
+				col.sorter = intSort;
 			}
 			else if (field.type == "n") {
-				field.sorter = numberSort;
+				col.sorter = numberSort;
 			}
 
 			var ui = UiMeta.uiTypes[field.uiType];
@@ -89,7 +163,23 @@ var UiMeta = {
 				if (ret === false)
 					return;
 			}
-			columns.push(col);
+			if (colIdx == null) {
+				columns.push(col);
+			}
+			else {
+				columns.splice(colIdx, 0, col);
+			}
+			return true;
+		}
+		function setCol(field, colIdx) {
+			var col = columns[colIdx];
+			if (field.title && field.title != field.name)
+				col.title = field.title;
+			if (field.opt && field.opt.formatter)
+				col.formatter = field.opt.formatter;
+			if (field.opt && field.opt.styler)
+				col.styler = field.opt.styler;
+			// var ui = UiMeta.uiTypes[field.uiType];
 		}
 	},
 
@@ -97,22 +187,23 @@ var UiMeta = {
 		if (!data)
 			return;
 
-		var tpl = '<div class="perm-mgr perm-emp" style="display:none">' + 
-			'<div class="menu-expand-group">' +
-				'<a class=""><span><i class="fa fa-pencil-square-o"></i>{title}</span></a>' +
-				'<div class="menu-expandable"></div>' +
-			'</div>' +
-		'</div>';
+		// 菜单组
 		var tpl1 = '<div class="menu-expand-group">' +
 				'<a class=""><span>{title}</span></a>' +
 				'<div class="menu-expandable"></div>' +
 			'</div>';
-		var tpl2 = '<a href="{link}">{title}</a>';
+		// 菜单项
+		var tpl2 = '<a href="{link}"><span>{title}</span></a>';
+		// 顶级菜单组
+		var tpl = '<div class="perm-mgr perm-emp" style="display:none">' + 
+			tpl1 +
+		'</div>';
 
 		var jo = $("#menu");
 		var isReset = jo.hasClass("wui-enhanced");
 		if (isReset)
 			jo.find(".wui-menu-dynamic").remove();
+		var topLevelMenu = [];
 		$.each(data, function (i, mi) {
 			applyMenu(jo, mi);
 		});
@@ -124,9 +215,36 @@ var UiMeta = {
 
 		function applyMenu(jp, mi, level)
 		{
+			var title = mi.name;
+			if (title[0] == '-') {
+				title = title.substr(1);
+				// 菜单项
+				jp.find(">a").each(function (i, e) {
+					if ($(e).text() == title)
+						$(e).hide();
+				});
+				// 菜单组
+				jp.find(">div>.menu-expand-group").each(function () {
+					if ($(this).find(">a:first").text() == title) {
+						$(this).hide();
+						return false;
+					}
+				});
+				return;
+			}
+
 			if (level == null)
 				level = 0;
-			if ($.isArray(mi.value)) {
+
+			// 菜单组默认有图标；菜单项默认无图标
+			var isGroup = $.isArray(mi.value);
+			if (mi.icon) {
+				title = '<i class="fa fa-pencil-square-o"></i>'.replace('fa-pencil-square-o', mi.icon) + title;
+			}
+			else if (isGroup) {
+				title = '<i class="fa fa-pencil-square-o"></i>' + title;
+			}
+			if (isGroup) {
 				var j1;
 				var isNew = true;
 				if (level == 0) {
@@ -135,39 +253,34 @@ var UiMeta = {
 						if ($(this).find(">a").text() == mi.name) {
 							j1 = $(this);
 							isNew = false;
+							// 把之前新创建的顶级菜单插入到它之前
+							j1.before(topLevelMenu);
 							return false;
 						}
 					});
 					// 新建菜单组，如果有单个菜单项（如“修改密码”），则插入在单个菜单项之前
 					if (j1 == null) {
 						var ji1 = jp.find(">a:first"); 
-						j1 = $(WUI.applyTpl(tpl, {title: mi.name}));
+						j1 = $(WUI.applyTpl(tpl, {title: title}));
 						if (ji1.size() > 0)
 							ji1.before(j1);
 						else
 							j1.appendTo(jp);
 					}
+					topLevelMenu.push(j1)
 				}
 				else {
-					j1 = $(WUI.applyTpl(tpl1, {title: mi.name})).appendTo(jp);
+					j1 = $(WUI.applyTpl(tpl1, {title: title})).appendTo(jp);
 				}
 				if (isNew)
 					j1.addClass("wui-menu-dynamic");
-				var j1p = j1.find(".menu-expandable");
+				var j1p = j1.find(".menu-expandable:first");
 				$.each(mi.value, function (i1, mi1) {
 					applyMenu(j1p, mi1, level+1);
 				});
 			}
 			else {
-				if (mi.name[0] == '-') {
-					var name = mi.name.substr(1)
-					jp.find(">a").each(function (i, e) {
-						if ($(e).text() == name)
-							$(e).hide();
-					});
-					return;
-				}
-				var j2 = $(WUI.applyTpl(tpl2, {title: mi.name})).appendTo(jp);
+				var j2 = $(WUI.applyTpl(tpl2, {title: title})).appendTo(jp);
 				if (/^(http|#|javascript)/.test(mi.value)) {
 					j2.attr("href", mi.value);
 				}
@@ -190,7 +303,7 @@ var UiMeta = {
 	init: function () {
 		var menuCode = 
 				'<div class="menu-expand-group menu-dev">' +
-					'<a><span>开发</span></a>' +
+					'<a><span><i class="fa fa-codepen"></i>开发</span></a>' +
 					'<div class="menu-expandable">' +
 						'<a href="#pageDiMeta">数据模型</a>' +
 						'<a href="#pageUiMeta">页面管理</a>' +
@@ -216,6 +329,20 @@ var UiMeta = {
 			},
 			addFieldByMeta: function (jdlg, jtbl, meta) {
 				if (meta.obj) {
+					$.each(meta.fields, function () {
+						var it = jdlg.gn(this.name);
+						if (it.ji.size() == 0)
+							return;
+
+						if (! this.uiType) {
+							it.visible(false);
+						}
+						else {
+							if (this.title && this.title != this.name)
+								it.setTitle(this.title);
+							this.uiType = ""; // dont show again
+						}
+					});
 					UiMeta.addFieldByMeta(jdlg, jtbl, meta);
 					return;
 				}
@@ -251,6 +378,8 @@ var UiMeta = {
 			return "date";
 		if (/^是否|Flag$/.test(s))
 			return "flag";
+		if (/附件|atts/i.test(s))
+			return "t";
 		return "s";
 	},
 
@@ -344,7 +473,7 @@ var UiMeta = {
 		}
 		else {
 			var tpl1 = '<input name="{name}">';
-			if (field.type == "t" || (field.len && field.len > 200)) {
+			if (field.type == "t" || (field.len && field.len > 200) || (field.opt && field.opt.format == 'textarea')) {
 				tpl1 = '<textarea name="{name}"></textarea>';
 			}
 			var ji = $(WUI.applyTpl(tpl1, field)).appendTo(jtd);
@@ -387,8 +516,8 @@ var UiMeta = {
 				ji.css(field.opt.style);
 				delete field.opt.style;
 			}
-			if (field.opt.required) {
-				jtd.prev().append('*');
+			if (field.opt.desc) {
+				ji.after('<p class="hint">' + field.opt.desc + "</p>");
 			}
 
 			var logic = $.extend({}, field.opt); // 从组件opt中独立出来，避免被组件影响
@@ -458,7 +587,9 @@ var UiMeta = {
 		if (ui == null)
 			ui = {};
 		ui.obj = di.name;
-		ui.name = di.title;
+		// 页面名不更新
+		if (!ui.name || force)
+			ui.name = di.title;
 
 		var fields = !force && ui.fields? JSON.parse(ui.fields): [];
 		var cols = di.cols? JSON.parse(di.cols): [];
@@ -497,6 +628,10 @@ var UiMeta = {
 					title: res.title,
 					type: "s",
 				}
+				if (!uicol.name) {
+					// def: "inv.whId" => whId; "(select 1) qty" => qty
+					uicol.name = res.def.match(/[^ .]+$/)[0];
+				}
 				// linkTo产生的虚拟字段默认不显示
 				if (vFields[uicol.name]) {
 					uicol.notInList = true;
@@ -522,13 +657,13 @@ var UiMeta = {
 				title: subobj.title,
 				type: "subobj",
 				uiType: "subobj",
-				uiMeta: subobj.title,
+				uiMeta: subobj.title || subobj.name,
 			};
 			uicol.opt = {
 				obj: subobj.obj,
 				relatedKey: subobj.cond,
 				valueField: subobj.name,
-				dlg: 'dlgUi_inst_' + subobj.title
+				dlg: 'dlgUi_inst_' + uicol.uiMeta
 			};
 			addField(uicol);
 		});
@@ -550,8 +685,6 @@ var UiMeta = {
 				});
 				if (idx >= 0) {
 					var uicol = fields[idx];
-					uicol.name = one.name;
-					uicol.title = one.title;
 					uicol.type = one.type;
 					if (one.linkTo)
 						uicol.linkTo = one.linkTo;
@@ -578,6 +711,7 @@ var UiMeta = {
 				return;
 			callSvr("UiCfg.setValue", {name: "menu"}, function () {
 				UiMeta.handleMenu(data);
+				initValue = str;
 				app_show("已成功更新");
 			}, {value: str});
 		}
@@ -623,8 +757,10 @@ var UiMeta = {
 					enableLiveAutocompletion: true
 				});
 				//ed.session.setTabSize(2);
-				ed.setValue(data);
-				ed.clearSelection();
+				if (data) {
+					ed.setValue(data);
+					ed.clearSelection();
+				}
 			});
 		}
 	},
@@ -652,6 +788,38 @@ var UiMeta = {
 				})
 			}
 		}
+	},
+
+/**
+@fn UiMeta.on(evname, pageOrDlg, fn)
+
+为页面或对话框绑定事件。示例：
+
+	var pageName = "pageOrder"; // 系统页面名以"page"开头；托管页面用UiMeta名，如"物流订单"
+	UiMeta.on("dg_toolbar", pageName, function (ev, button, jtbl, jdlg) {
+		var jpage = $(ev.target);
+	});
+
+	var dlgName = "dlgOrder"; // 托管对话框用 "dlgUi_inst_{UiMeta名}"，如"dlgUi_inst_物流订单"
+	UiMeta.on("create", dlgName, function (ev) {
+		var jdlg = $(ev.target);
+	});
+ */
+	on(evname, pageOrDlg, fn) {
+		// $(document).off("dg_toolbar.客户").on("dg_toolbar.客户", ".wui-page-客户", 客户_onToolbar);
+		// $(document).off("create.dlgOrder").on("create.dlgOrder", "#dlgOrder", dlgOrder_onCreate);
+		evname += ".uimeta_" + pageOrDlg;
+		var sel;
+		if (pageOrDlg.startsWith("page")) {
+			sel = ".wui-page." + pageOrDlg;
+		}
+		else if (pageOrDlg.startsWith("dlg")) {
+			sel = "#" + pageOrDlg;
+		}
+		else {
+			sel = ".wui-page-" + pageOrDlg;
+		}
+		$(document).off(evname).on(evname, sel, fn);
 	}
 }
 
@@ -685,7 +853,16 @@ uiTypes["combo"] = {
 		WUI.assert(opt.enumMap, "字段"+field.name+"定义错误");
 
 		ctx.col.jdEnumMap = opt.enumMap;
-		ctx.col.formatter = WUI.formatter.enum(opt.enumMap);
+		if (!ctx.col.formatter) {
+			ctx.col.formatter = WUI.formatter.enum(opt.enumMap);
+		}
+		else {
+			var f1 = WUI.formatter.enum(opt.enumMap);
+			var f2 = ctx.col.formatter;
+			ctx.col.formatter = function (val, row) {
+				return f2(f1(val, row), row);
+			}
+		}
 	},
 	// ctx: {jtd}
 	renderInput: function (field, ctx) {
@@ -767,9 +944,11 @@ uiTypes["upload"] = {
 
 uiTypes["subobj"] = {
 	// ctx: {col}
+	/*
 	renderCol: function (field, ctx) {
 		return false;
 	},
+	*/
 	// ctx: {jtd}
 	renderInput: function (field, ctx) {
 		var opt = field.opt;

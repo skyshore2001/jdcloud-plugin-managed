@@ -1,8 +1,9 @@
 /**
 @module pageUi 通用托管页面
 
-- showPageOpt: {uimeta?=title}
+- showPageOpt: {uimeta?=title, sortName?="id", sortOrder?="desc"}
 - 通过uimeta参数指定UiMeta名字，如果未指定则与title参数相同。
+- sortName和sortOrder指定列表排序条件，默认按id倒序排列。
 
 示例：
 
@@ -43,8 +44,8 @@ function initPageUi(opt)
 			url: WUI.makeUrl(uiMeta.obj + ".query"),
 			toolbar: WUI.dg_toolbar(jtbl, jdlg, "export"),
 			onDblClickRow: WUI.dg_dblclick(jtbl, jdlg),
-			sortOrder: "desc",
-			sortName: "id",
+			sortOrder: opt.sortOrder || "desc",
+			sortName: opt.sortName || "id",
 			columns: [ columns ]
 		});
 	}

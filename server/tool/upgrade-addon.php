@@ -5,6 +5,8 @@ require_once("api.php");
 
 $addonPackage="tool/upgrade/addon.xml";
 
+$jsonOut = false;
+
 if (isCLI()) {
 	$ac = $argv[1];
 }
@@ -14,19 +16,60 @@ else {
 		$ac = substr($ac, 1);
 	header("content-type: text/plain");
 	header("cache-control: nocache");
-}
 
-if ($ac == "all") {
-	doExport();
+	if ($_GET["fmt"] == "json") {
+		$ret = null;
+		$jsonOut = true;
+		$debugInfo = redirectOut(function () use ($ac, &$ret) {
+			$ret = doCmd($ac);
+		});
+		if ($debugInfo)
+			$ret[] = $debugInfo;
+		echo(jsonEncode($ret, true));
+		exit();
+	}
 }
-else if ($ac == "install") {
-	doImport();
-}
-else if ($ac == "clean") {
-	doCleanAll();
-}
-else {
-	echo("Usage: php upgrade-addon.php all|install|clean\n");
+doCmd($ac);
+
+function doCmd($ac)
+{
+	global $jsonOut;
+	$ret = [0, null];
+	try {
+		if ($ac == "all") {
+			doExport();
+		}
+		else if ($ac == "install") {
+			doImport();
+		}
+		else if ($ac == "clean") {
+			doCleanAll();
+		}
+		else {
+			if ($jsonOut) {
+				return [E_PARAM, "bad cmd $ac"];
+			}
+			echo("Usage: php upgrade-addon.php all|install|clean\n");
+		}
+	}
+	catch (DirectReturn $ex) {
+		if ($jsonOut) {
+			if ($ex->isUserFmt) {
+				$ret = $ex->data;
+			}
+		}
+	}
+	catch (MyException $ex) {
+		if ($jsonOut) {
+			$ret = [$ex->getCode(), $ex->getMessage()];
+			if ($ex->internalMessage)
+				$ret[] = $ex->internalMessage;
+		}
+		else {
+			echo($ex);
+		}
+	}
+	return $ret;
 }
 
 function doExport()
@@ -113,6 +156,16 @@ fieldFn($k, $v): 对字段进行自定义处理
 				return;
 			}
 		}
+
+		if ($v === null) {
+			$v = "null";
+		}
+		else if ($v === true) {
+			$v = "true";
+		}
+		else if ($v === false) {
+			$v = "false";
+		}
 		$wr->writeElement($k, $v);
 	}
 
@@ -142,15 +195,25 @@ fieldFn($k, $v): 对字段进行自定义处理
 			return self::readArr($xml);
 		}
 
-		if ($xml->count() == 0)
-			return trim((string)$xml);
+		if ($xml->count() == 0) {
+			$v = trim((string)$xml);
+			if ($v === "null")
+				$v = null;
+			else if ($v === "true")
+				$v = true;
+			else if ($v === "false")
+				$v = false;
+			return $v;
+		}
 
 		// is obj
 		return self::readObj($xml);
 	}
 
 	static function readXml($file) {
-		$rootXml = simplexml_load_file($file);
+		@$rootXml = simplexml_load_file($file);
+		if (!$rootXml)
+			jdRet(E_SERVER, "fail to load addon file", "加载Addon文件失败");
 		if ($rootXml->getName() != "JdcloudAddon")
 			jdRet(E_PARAM, "bad jscloud addon package");
 		foreach ($rootXml as $table => $tableXml) { // table: <DiMetaTable>
@@ -175,7 +238,10 @@ function doImport()
 	login();
 	$rv = callSvc("DiMeta.syncAll");
 	if ($rv[0] != 0) {
-		echo("*** fail to sync meta\n" . jsonEncode($rv,true) . "\n");
+		echo("*** fail to sync meta: " . $rv[1] . " (" . $rv[2] . ")\n");
+		global $jsonOut;
+		if ($jsonOut)
+			jdRet(null, $rv);
 		return;
 	}
 	echo("=== sync meta done\n");
@@ -186,7 +252,10 @@ function doCleanAll()
 	login();
 	$rv = callSvc("DiMeta.cleanAll");
 	if ($rv[0] != 0) {
-		echo("*** fail to clean all\n" . jsonEncode($rv,true) . "\n");
+		echo("*** fail to clean all: " . $rv[1] . " (" . $rv[2] . ")\n");
+		global $jsonOut;
+		if ($jsonOut)
+			jdRet(null, $rv);
 		return;
 	}
 	echo("=== addon-clean done\n");
@@ -196,5 +265,6 @@ function login()
 {
 	if (! isCLI())
 		session_start(); // 注意：此处开的session位置与默认callSvc中位置不同，不影响正常应用的登录。
-	$_SESSION["empId"] = 1;
+	$_SESSION["empId"] = -1;
+	$_SESSION["perms"] = "mgr";
 }

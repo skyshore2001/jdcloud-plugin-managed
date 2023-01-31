@@ -11,18 +11,26 @@ var schema = {
 				title: "res/字段定义", // {def, name, title}
 				type: "array",
 				format: "table",
+				required: true,
 				items: {
 					title: "虚拟字段",
 					type: "object",
 					properties: {
 						def: {
-							type: "string"
+							type: "string",
+							format: "textarea",
+							required: true,
+							options: {
+								input_width: '60%',
+							}
 						},
 						name: {
-							type: "string"
+							type: "string",
+							description: "如果不填，则使用def中的名字"
 						},
 						title: {
-							type: "string"
+							type: "string",
+							description: "如果不填，则使用name"
 						}
 					}
 				}
@@ -30,6 +38,7 @@ var schema = {
 			join: {
 				title: "join/关联语句",
 				type: "string",
+				format: "textarea",
 				description: "示例: <code>`LEFT JOIN Employee emp ON emp.id=t0.empId`</code> t0为当前表"
 			},
 			require: {
@@ -58,6 +67,4 @@ var schema = {
 
 ({
 	schema: schema,
-	no_additional_properties: true,
-	show_opt_in: false
 })

@@ -6,24 +6,16 @@ var schema = {
 	items: {
 		title: "AC逻辑",
 		type: "object",
-		headerTemplate: "{{self.name}}",
+		headerTemplate: "{{i1}} {{self.class}}",
 		properties: {
-			name: {
-				title: "name/名称",
-				type: "string",
-				required: true,
-			},
 			class: {
 				title: "AC类",
 				type: "string",
 				required: true,
-				enum: [
-					"AC0",
-					"AC1",
-					"AC2"
-				],
-				default: "AC0"
+				default: "AC0",
+				description: "指定使用AC0/AC1/AC2或完整子类名"
 			},
+			/*
 			type: {
 				title: "type",
 				type: "string",
@@ -32,6 +24,7 @@ var schema = {
 					"default",
 				],
 			},
+			*/
 			allowedAc: {
 				title: "allowedAc",
 				type: "array",
@@ -142,5 +135,4 @@ var schema = {
 ({
 	schema: schema,
 	no_additional_properties: true,
-	show_opt_in: false
 })
